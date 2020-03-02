@@ -17,11 +17,13 @@ def parse_args(args: List[str]) -> Namespace:
     parser = ArgumentParser()
 
     parser.add_argument(
-        'datapath',
+        '--datapath', '-d',
+        required=True,
     )
 
     parser.add_argument(
-        'god',
+        '--god', '-g',
+        required=True
     )
 
     return parser.parse_known_args(args)[0]
@@ -180,5 +182,5 @@ def make_smitebuilds(builds: List[List[int]], num_core: int) -> List[SmiteBuild]
 
 
 if __name__ == '__main__':
-    args = parse_args(sys.argv[1:])
+    args = parse_args(sys.argv)
     main(args.datapath, args.god)
