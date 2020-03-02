@@ -74,6 +74,11 @@ def main(path_to_data: str, target_god: str):
     sgd_classifier = SGDClassifier(max_iter=1000)
     sgd_classifier.fit(npdata_normalized, npdata_winlabel)
 
+    print('sgd_score:', sgd_classifier.score(npdata_normalized, npdata_winlabel))
+
+    # NOTE I could insert a clustering step here to absolutely match the original design
+    #        I might do that and see if it improves performance
+
     new_winlabel = sgd_classifier.predict(npdata_normalized)
 
     item_data = np.array([
@@ -136,8 +141,8 @@ def main(path_to_data: str, target_god: str):
         print('dt_rank:', smitebuild[2])
         print('bnb_rank:', smitebuild[1])
 
-def create_builds(tree, node: int, local_build: List[int], builds: List[List[int]]):
 
+def create_builds(tree, node: int, local_build: List[int], builds: List[List[int]]):
     # this stops if we hit a leaf node
     if tree.children_left[node] == tree.children_right[node]:
         return None
