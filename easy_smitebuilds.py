@@ -78,8 +78,8 @@ def main(path_to_data: str, target_god: str):
 
     print('sgd_score:', sgd_classifier.score(npdata_normalized, npdata_winlabel))
 
-    # NOTE I could insert a clustering step here to absolutely match the original design
-    #        I might do that and see if it improves performance
+    # NOTE original design included a clustering step but after research
+    #        I believe simply predicting based on SGD is more than sufficient
 
     new_winlabel = sgd_classifier.predict(npdata_normalized)
 

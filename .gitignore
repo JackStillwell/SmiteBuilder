@@ -130,3 +130,6 @@ dmypy.json
 
 # smitedata
 SmiteData-master
+
+# vscode
+.vscode
