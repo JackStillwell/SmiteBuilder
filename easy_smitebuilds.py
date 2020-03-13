@@ -19,12 +19,10 @@ def parse_args(args: List[str]) -> Namespace:
     parser.add_argument(
         "--datapath", "-d", required=True,
     )
-
     parser.add_argument("--god", "-g", required=True)
-
     parser.add_argument("--conquest_tier", "-ct", default=15)
-
-    parser.add_argument("--build_dt_score", "-dts", default=0.5)
+    parser.add_argument("--probability_score_limit", "-psl", default=0.5)
+    parser.add_argument("--probability_score_cutoff", "-psc", default=0.7)
 
     return parser.parse_known_args(args)[0]
 
@@ -40,6 +38,7 @@ def main(
     target_god: str,
     conquest_tier_cutoff: int,
     probability_score_limit: float,
+    probability_score_cutoff: float,
 ):
     # NOTE assumes laid out as in SmiteData repo
     with open(os.path.join(path_to_data, "gods.json"), "r") as infile:
@@ -168,7 +167,6 @@ def main(
 
     dt_predictions = dt_classifier.predict_proba(possible_builds)
 
-    probability_score_cutoff = 0.7
     possible_builds = [
         x
         for idx, x in enumerate(possible_builds)
@@ -232,11 +230,19 @@ def main(
     ]
     smitebuild_ranks.sort(key=lambda x: x[1], reverse=True)
 
-    for smitebuild in [
-        x
-        for x in smitebuild_ranks
-        #  if x[2] > probability_score_cutoff
-    ][:3]:
+    smitebuild_ranks_pruned = [
+        x for x in smitebuild_ranks if x[2] > probability_score_cutoff
+    ][:3]
+    while len(smitebuild_ranks_pruned) < 3:
+        probability_score_cutoff -= 0.05
+        smitebuild_ranks_pruned = [
+            x for x in smitebuild_ranks if x[2] > probability_score_cutoff
+        ][:3]
+
+        if probability_score_cutoff < 0:
+            break
+
+    for smitebuild in smitebuild_ranks_pruned:
         print("core:", [id_to_itemname[item_data_ids[x]] for x in smitebuild[0].core])
         print(
             "optional:",
@@ -285,4 +291,11 @@ def make_smitebuilds(builds: List[List[int]], num_core: int) -> List[SmiteBuild]
 
 if __name__ == "__main__":
     args = parse_args(sys.argv)
-    main(args.datapath, args.god, int(args.conquest_tier), float(args.build_dt_score))
+    main(
+        args.datapath,
+        args.god,
+        int(args.conquest_tier),
+        float(args.probability_score_limit),
+        float(args.probability_score_cutoff),
+    )
+
