@@ -17,78 +17,124 @@ def parse_args(args: List[str]) -> Namespace:
     parser = ArgumentParser()
 
     parser.add_argument(
-        '--datapath', '-d',
-        required=True,
+        "--datapath", "-d", required=True,
     )
 
-    parser.add_argument(
-        '--god', '-g',
-        required=True
-    )
+    parser.add_argument("--god", "-g", required=True)
+
+    parser.add_argument("--conquest_tier", "-ct", default=15)
+
+    parser.add_argument("--build_dt_score", "-dts", default=0.5)
 
     return parser.parse_known_args(args)[0]
 
 
 @dataclass
-class SmiteBuild():
+class SmiteBuild:
     core: Set[int]
     optional: Set[int]
 
 
-def main(path_to_data: str, target_god: str):
+def main(
+    path_to_data: str,
+    target_god: str,
+    conquest_tier_cutoff: int,
+    probability_score_limit: float,
+):
     # NOTE assumes laid out as in SmiteData repo
-    with open(os.path.join(path_to_data, 'gods.json'), 'r') as infile:
+    with open(os.path.join(path_to_data, "gods.json"), "r") as infile:
         gods = json.loads(infile.readline())
-        godname_to_id = {x['Name']: x['id'] for x in gods}
+        godname_to_id = {x["Name"]: x["id"] for x in gods}
 
-    with open(os.path.join(path_to_data, 'items.json'), 'r') as infile:
+    with open(os.path.join(path_to_data, "items.json"), "r") as infile:
         items = json.loads(infile.readline())
-        id_to_itemname = {x['ItemId']: x['DeviceName'] for x in items}
-        item_ids = [x['ItemId'] for x in items]
+        id_to_itemname = {x["ItemId"]: x["DeviceName"] for x in items}
+        item_ids = [x["ItemId"] for x in items]
 
-    with open( os.path.join(
+    with open(
+        os.path.join(
             path_to_data,
-            'conquest_match_data',
-            str(godname_to_id[target_god]) + '.json'
+            "conquest_match_data",
+            str(godname_to_id[target_god]) + ".json",
         ),
-        'r') as infile:
+        "r",
+    ) as infile:
         god_data = json.loads(infile.readline())
 
-    npdata = np.array([
-        np.divide(
-            np.array([
-                x['assists'],
-                x['damage_mitigated'],
-                x['damage_player'],
-                x['damage_taken'],
-                x['deaths'],
-                x['healing'],
-                x['healing_player_self'],
-                x['kills_player'],
-                x['structure_damage']
-            ]),
-            x['match_time_minutes']
-        )
-    for x in god_data])
-    npdata_normalized = npdata / npdata.max(axis=0)
-    npdata_winlabel = np.array([1 if x['win_status'] == 'Winner' else 0 for x in god_data])
+    # filter god data by conquest rank plat and above
+    god_data = [x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff]
+    while len(god_data) < 500:
+        conquest_tier_cutoff -= 1
+        god_data = [x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff]
 
-    sgd_classifier = SGDClassifier(max_iter=1000)
+    print(
+        len(god_data),
+        "matches found with a conquest_tier cutoff of",
+        conquest_tier_cutoff,
+    )
+
+    npdata = np.array(
+        [
+            np.divide(
+                np.array(
+                    [
+                        x["assists"],
+                        x["damage_mitigated"],
+                        x["damage_player"],
+                        x["damage_taken"],
+                        x["deaths"],
+                        x["healing"],
+                        x["healing_player_self"],
+                        x["kills_player"],
+                        x["structure_damage"],
+                    ]
+                ),
+                x["match_time_minutes"],
+            )
+            for x in god_data
+        ]
+    )
+    npdata_normalized = npdata / np.array(
+        [x if x != 0 else 1 for x in npdata.max(axis=0)]
+    )
+    npdata_winlabel = np.array(
+        [1 if x["win_status"] == "Winner" else 0 for x in god_data]
+    )
+
+    print("pruning", npdata_normalized.shape[0], "rows for non-nan validity")
+
+    valid_rows = [
+        (x, y)
+        for x, y in zip(npdata_normalized, npdata_winlabel)
+        if np.all(np.isfinite(x)) and np.all(np.isfinite(y))
+    ]
+
+    print(len(valid_rows), "rows remain")
+
+    if not valid_rows:
+        print("No valid rows remain. Exiting...")
+        return None
+
+    temp = list(zip(*valid_rows))
+    npdata_normalized = np.array(list(temp[0]))
+    npdata_winlabel = np.array(list(temp[1]))
+
+    sgd_classifier = SGDClassifier(max_iter=1000, random_state=0)
     sgd_classifier.fit(npdata_normalized, npdata_winlabel)
 
-    print('sgd_score:', sgd_classifier.score(npdata_normalized, npdata_winlabel))
+    print("sgd_score:", sgd_classifier.score(npdata_normalized, npdata_winlabel))
 
     # NOTE original design included a clustering step but after research
     #        I believe simply predicting based on SGD is more than sufficient
 
     new_winlabel = sgd_classifier.predict(npdata_normalized)
 
-    item_data = np.array([
+    item_data = np.array(
         [
-            1 if item_id in x['item_ids'] else 0
-            for item_id in item_ids
-        ] for x in god_data
-    ])
+            [1 if item_id in x["item_ids"] else 0 for item_id in item_ids]
+            for x in god_data
+        ]
+    )
 
     item_max = np.max(item_data, axis=0)
     todelete = [idx for idx in range(len(item_max)) if item_max[idx] == 0]
@@ -96,37 +142,86 @@ def main(path_to_data: str, target_god: str):
 
     item_data_ids = [x for idx, x in enumerate(item_ids) if idx not in todelete]
 
-    dt_classifier = DecisionTreeClassifier(criterion='entropy', max_features=1)
+    dt_classifier = DecisionTreeClassifier(
+        criterion="entropy", max_features=1, random_state=0,
+    )
     dt_classifier.fit(item_data, new_winlabel)
 
-    print('dt_score:', dt_classifier.score(item_data, new_winlabel))
+    print("dt_score:", dt_classifier.score(item_data, new_winlabel))
 
     bnb_classifier = BernoulliNB()
     bnb_classifier.fit(item_data, new_winlabel)
 
-    print('bnb_score:', bnb_classifier.score(item_data, new_winlabel))
+    print("bnb_score:", bnb_classifier.score(item_data, new_winlabel))
 
+    print("Constructing builds from tree...")
     builds = []
     create_builds(dt_classifier.tree_, 0, [], builds)
 
-    possible_builds = np.array([
-        [1 if idx in x else 0 for idx in range(len(item_data_ids))]
-        for x in builds
-    ])
+    possible_builds = np.array(
+        [[1 if idx in x else 0 for idx in range(len(item_data_ids))] for x in builds]
+    )
+
+    if not possible_builds.size > 0:
+        print("No possible builds found. Exiting...")
+        return None
+
     dt_predictions = dt_classifier.predict_proba(possible_builds)
-    possible_builds = [x for idx, x in enumerate(possible_builds) if dt_predictions[idx][1] > 0.7]
+
+    probability_score_cutoff = 0.7
+    possible_builds = [
+        x
+        for idx, x in enumerate(possible_builds)
+        if dt_predictions[idx][1] > probability_score_cutoff
+    ]
+    while not possible_builds:
+        probability_score_cutoff -= 0.05
+        possible_builds = [
+            x
+            for idx, x in enumerate(possible_builds)
+            if dt_predictions[idx][1] > probability_score_cutoff
+        ]
+
+        if probability_score_cutoff < probability_score_limit:
+            print(
+                "Probability cutoff reached",
+                probability_score_cutoff,
+                ". No viable builds found. Exiting...",
+            )
+            return None
+
+    print(
+        len(possible_builds),
+        "possible builds found with a success probability cutoff of",
+        probability_score_cutoff,
+    )
 
     feature_builds = [
-        [idx for idx, x in enumerate(build) if x == 1]
-        for build in possible_builds
+        [idx for idx, x in enumerate(build) if x == 1] for build in possible_builds
     ]
 
-    smitebuilds = make_smitebuilds(feature_builds, 4)
+    core_size = 4
+    smitebuilds = make_smitebuilds(feature_builds, core_size)
+    while not smitebuilds:
+        core_size -= 1
+        smitebuilds = make_smitebuilds(feature_builds, core_size)
 
-    possible_smitebuilds = np.array([
-        [1 if idx in x.core else 0 for idx in range(len(item_data_ids))]
-        for x in smitebuilds
-    ])
+        if core_size < 1:
+            print("No core found. Exiting...")
+            return None
+
+    print(len(smitebuilds), "found with a core_size of", core_size)
+
+    possible_smitebuilds = np.array(
+        [
+            [1 if idx in x.core else 0 for idx in range(len(item_data_ids))]
+            for x in smitebuilds
+        ]
+    )
+
+    if not possible_smitebuilds.size > 0:
+        print("Exiting...")
+        return None
 
     bnb_ranking = bnb_classifier.predict_proba(possible_smitebuilds)
     dt_ranking = dt_classifier.predict_proba(possible_smitebuilds)
@@ -137,11 +232,18 @@ def main(path_to_data: str, target_god: str):
     ]
     smitebuild_ranks.sort(key=lambda x: x[1], reverse=True)
 
-    for smitebuild in [x for x in smitebuild_ranks if x[2] > 0.7][:3]:
-        print('core:', [id_to_itemname[item_data_ids[x]] for x in smitebuild[0].core])
-        print('optional:', [id_to_itemname[item_data_ids[x]] for x in smitebuild[0].optional])
-        print('dt_rank:', smitebuild[2])
-        print('bnb_rank:', smitebuild[1])
+    for smitebuild in [
+        x
+        for x in smitebuild_ranks
+        #  if x[2] > probability_score_cutoff
+    ][:3]:
+        print("core:", [id_to_itemname[item_data_ids[x]] for x in smitebuild[0].core])
+        print(
+            "optional:",
+            [id_to_itemname[item_data_ids[x]] for x in smitebuild[0].optional],
+        )
+        print("dt_rank:", smitebuild[2])
+        print("bnb_rank:", smitebuild[1])
 
 
 def create_builds(tree, node: int, local_build: List[int], builds: List[List[int]]):
@@ -181,6 +283,6 @@ def make_smitebuilds(builds: List[List[int]], num_core: int) -> List[SmiteBuild]
     return smitebuilds
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args(sys.argv)
-    main(args.datapath, args.god)
+    main(args.datapath, args.god, int(args.conquest_tier), float(args.build_dt_score))
