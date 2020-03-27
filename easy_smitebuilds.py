@@ -70,6 +70,9 @@ def main(
             x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff
         ]
 
+        if conquest_tier_cutoff < 0:
+            break
+
     god_data = filtered_god_data
 
     print(
