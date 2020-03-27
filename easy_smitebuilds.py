@@ -64,7 +64,7 @@ def main(
     filtered_god_data = [
         x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff
     ]
-    while len(god_data) < 500:
+    while len(filtered_god_data) < 500:
         conquest_tier_cutoff -= 1
         filtered_god_data = [
             x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff
