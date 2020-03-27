@@ -3,7 +3,7 @@ import sys
 import os
 
 from argparse import ArgumentParser, Namespace
-from typing import List, Set
+from typing import List, Set, Tuple
 from copy import deepcopy
 from dataclasses import dataclass
 
@@ -61,10 +61,16 @@ def main(
         god_data = json.loads(infile.readline())
 
     # filter god data by conquest rank plat and above
-    god_data = [x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff]
+    filtered_god_data = [
+        x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff
+    ]
     while len(god_data) < 500:
         conquest_tier_cutoff -= 1
-        god_data = [x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff]
+        filtered_god_data = [
+            x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff
+        ]
+
+    god_data = filtered_god_data
 
     print(
         len(god_data),
@@ -100,7 +106,8 @@ def main(
         [1 if x["win_status"] == "Winner" else 0 for x in god_data]
     )
 
-    print("pruning", npdata_normalized.shape[0], "rows for non-nan validity")
+    npdn_shape: Tuple[int, int] = npdata_normalized.shape
+    print("pruning", npdn_shape[0], "rows for non-nan validity")
 
     valid_rows = [
         (x, y)
@@ -190,7 +197,7 @@ def main(
 
     print(
         len(possible_builds),
-        "possible builds found with a success probability cutoff of",
+        "possible build paths found with a success probability cutoff of",
         probability_score_cutoff,
     )
 
@@ -208,7 +215,7 @@ def main(
             print("No core found. Exiting...")
             return None
 
-    print(len(smitebuilds), "found with a core_size of", core_size)
+    print(len(smitebuilds), "possible builds found with a core_size of", core_size)
 
     possible_smitebuilds = np.array(
         [
@@ -298,4 +305,3 @@ if __name__ == "__main__":
         float(args.probability_score_limit),
         float(args.probability_score_cutoff),
     )
-
