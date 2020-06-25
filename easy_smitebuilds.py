@@ -13,11 +13,19 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
 
 
+conquest = "conquest_match_data"
+joust = "joust_match_data"
+duel = "duel_match_data"
+
+
 def parse_args(args: List[str]) -> Namespace:
     parser = ArgumentParser()
 
     parser.add_argument(
         "--datapath", "-d", required=True,
+    )
+    parser.add_argument(
+        "--queue", "-q", required=True, choices=["conquest", "joust", "duel"]
     )
     parser.add_argument("--god", "-g", required=True)
     parser.add_argument("--conquest_tier", "-ct", default=15)
@@ -35,6 +43,7 @@ class SmiteBuild:
 
 def main(
     path_to_data: str,
+    queue: str,
     target_god: str,
     conquest_tier_cutoff: int,
     probability_score_limit: float,
@@ -50,11 +59,15 @@ def main(
         id_to_itemname = {x["ItemId"]: x["DeviceName"] for x in items}
         item_ids = [x["ItemId"] for x in items]
 
+    queue_path = {
+        "conquest": "conquest_match_data",
+        "joust": "joust_match_data",
+        "duel": "duel_match_data",
+    }[queue]
+
     with open(
         os.path.join(
-            path_to_data,
-            "conquest_match_data",
-            str(godname_to_id[target_god]) + ".json",
+            path_to_data, queue_path, str(godname_to_id[target_god]) + ".json",
         ),
         "r",
     ) as infile:
@@ -303,6 +316,7 @@ if __name__ == "__main__":
     args = parse_args(sys.argv)
     main(
         args.datapath,
+        args.queue,
         args.god,
         int(args.conquest_tier),
         float(args.probability_score_limit),
