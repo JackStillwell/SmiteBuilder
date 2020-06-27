@@ -3,19 +3,15 @@ import sys
 import os
 
 from argparse import ArgumentParser, Namespace
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Optional
 from copy import deepcopy
+from collections import namedtuple
 from dataclasses import dataclass
 
 import numpy as np
 from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
-
-
-conquest = "conquest_match_data"
-joust = "joust_match_data"
-duel = "duel_match_data"
 
 
 def parse_args(args: List[str]) -> Namespace:
@@ -41,6 +37,10 @@ class SmiteBuild:
     optional: Set[int]
 
 
+ReadableSmiteBuild = namedtuple("ReadableSmiteBuild", ["core", "optional"])
+MainReturn = namedtuple("MainReturn", ["build", "dt_rank", "bnb_rank"])
+
+
 def main(
     path_to_data: str,
     queue: str,
@@ -48,7 +48,7 @@ def main(
     conquest_tier_cutoff: int,
     probability_score_limit: float,
     probability_score_cutoff: float,
-):
+) -> Optional[List[MainReturn]]:
     # NOTE assumes laid out as in SmiteData repo
     with open(os.path.join(path_to_data, "gods.json"), "r") as infile:
         gods = json.loads(infile.readline())
@@ -59,11 +59,7 @@ def main(
         id_to_itemname = {x["ItemId"]: x["DeviceName"] for x in items}
         item_ids = [x["ItemId"] for x in items]
 
-    queue_path = {
-        "conquest": "conquest_match_data",
-        "joust": "joust_match_data",
-        "duel": "duel_match_data",
-    }[queue]
+    queue_path = queue + "_match_data"
 
     with open(
         os.path.join(
@@ -265,7 +261,19 @@ def main(
         if probability_score_cutoff < 0:
             break
 
+    returnval = []
     for smitebuild in smitebuild_ranks_pruned:
+        elem = MainReturn(
+            build=ReadableSmiteBuild(
+                core=[id_to_itemname[item_data_ids[x]] for x in smitebuild[0].core],
+                optional=[
+                    id_to_itemname[item_data_ids[x]] for x in smitebuild[0].optional
+                ],
+            ),
+            dt_rank=smitebuild[2],
+            bnb_rank=smitebuild[1],
+        )
+        returnval.append(elem)
         print("core:", [id_to_itemname[item_data_ids[x]] for x in smitebuild[0].core])
         print(
             "optional:",
@@ -273,6 +281,8 @@ def main(
         )
         print("dt_rank:", smitebuild[2])
         print("bnb_rank:", smitebuild[1])
+
+    return returnval
 
 
 def create_builds(tree, node: int, local_build: List[int], builds: List[List[int]]):
