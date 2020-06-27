@@ -1,9 +1,10 @@
 import discord
 import easy_smitebuilds
+import os
 
 client = discord.Client()
 
-with open("bot_info.txt") as infile:
+with open(os.path.join("..", "bot_info.txt")) as infile:
     datapath = infile.readline().strip()
     token = infile.readline().strip()
 
@@ -21,15 +22,15 @@ async def on_message(message):
             await message.channel.send("An error occurred")
 
         else:
+            send_str = ""
             for smitebuild in builds:
-                await message.channel.send("dt_rank:", smitebuild.dt_rank)
-                await message.channel.send("bnb_rank:", smitebuild.bnb_rank)
-                await message.channel.send(
-                    "core:", smitebuild.build.core,
-                )
-                await message.channel.send(
-                    "optional:", smitebuild.build.optional,
-                )
+                send_str += "dt_rank: " + str(smitebuild.dt_rank) + "\n"
+                send_str += "bnb_rank: " + str(smitebuild.bnb_rank) + "\n"
+                send_str += "core: " + str(smitebuild.build.core) + "\n"
+                send_str += "optional: " + str(smitebuild.build.optional) + "\n"
+                send_str += "\n"
+
+            await message.channel.send(send_str)
 
 
 client.run(token)
