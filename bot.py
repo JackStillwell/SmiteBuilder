@@ -15,8 +15,10 @@ async def on_message(message):
         return
 
     if message.content.startswith("!build"):
-        god = message.content.split(" ")[1]
-        builds = easy_smitebuilds.main(datapath, "conquest", god, 15, 0.5, 0.7)
+        args = message.content.split("_")
+        god = args[1]
+        queue = args[2]
+        builds = easy_smitebuilds.main(datapath, queue, god, 15, 0.5, 0.7)
 
         if builds is None:
             await message.channel.send("An error occurred")
