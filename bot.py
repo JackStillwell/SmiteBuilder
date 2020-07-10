@@ -18,10 +18,20 @@ async def on_message(message):
         args = message.content.split("_")
         god = args[1]
         queue = args[2]
-        builds = easy_smitebuilds.main(datapath, queue, god, 15, 0.5, 0.7)
+
+        builds = None
+        try:
+            builds = easy_smitebuilds.main(datapath, queue, god, 15, 0.5, 0.7)
+
+        except KeyError:
+            await message.channel.send(
+                "Could not find god "
+                + god
+                + "\nDon't forget to use correct capitalization!",
+            )
 
         if builds is None:
-            await message.channel.send("An error occurred")
+            await message.channel.send("No builds found")
 
         else:
             send_str = ""
