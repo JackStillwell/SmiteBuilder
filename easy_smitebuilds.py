@@ -154,8 +154,16 @@ def main(
         ]
     )
 
-    item_max = np.max(item_data, axis=0)
-    todelete = [idx for idx in range(len(item_max)) if item_max[idx] == 0]
+    # find out how many times the item was purchased
+    item_count = np.sum(item_data, axis=0)
+
+    # remove any item purchased less than 3% of the time
+    # TODO make the purchase percentage cutoff an arg
+    todelete = [
+        idx
+        for idx in range(len(item_count))
+        if item_count[idx] > (item_data.shape[0] * 0.03)
+    ]
     item_data = np.delete(item_data, todelete, axis=1)
 
     item_data_ids = [x for idx, x in enumerate(item_ids) if idx not in todelete]
