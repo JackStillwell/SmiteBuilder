@@ -57,6 +57,7 @@ def main(
     with open(os.path.join(path_to_data, "items.json"), "r") as infile:
         items = json.loads(infile.readline())
         id_to_itemname = {x["ItemId"]: x["DeviceName"] for x in items}
+        itemname_to_id = {x["DeviceName"]: x["ItemId"] for x in items}
         item_ids = [x["ItemId"] for x in items]
 
     queue_path = queue + "_match_data"
@@ -83,6 +84,14 @@ def main(
             break
 
     god_data = filtered_god_data
+
+    # edit the god data so that all evolved items are the base items
+    for x in god_data:
+        for idx, item in enumerate(x["item_ids"]):
+            if item != 0 and "Evolved" in id_to_itemname[item]:
+                item_name = id_to_itemname[item][8:]
+                new_id = itemname_to_id[item_name]
+                x["item_ids"][idx] = new_id
 
     print(
         len(god_data),
@@ -162,7 +171,7 @@ def main(
     todelete = [
         idx
         for idx in range(len(item_count))
-        if item_count[idx] > (item_data.shape[0] * 0.03)
+        if item_count[idx] < (item_data.shape[0] * 0.03)
     ]
     item_data = np.delete(item_data, todelete, axis=1)
 
