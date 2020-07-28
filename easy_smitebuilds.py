@@ -57,6 +57,7 @@ def main(
     with open(os.path.join(path_to_data, "items.json"), "r") as infile:
         items = json.loads(infile.readline())
         id_to_itemname = {x["ItemId"]: x["DeviceName"] for x in items}
+        itemname_to_id = {x["DeviceName"]: x["ItemId"] for x in items}
         item_ids = [x["ItemId"] for x in items]
 
     queue_path = queue + "_match_data"
@@ -83,6 +84,14 @@ def main(
             break
 
     god_data = filtered_god_data
+
+    # edit the god data so that all evolved items are the base items
+    for x in god_data:
+        for idx, item in enumerate(x["item_ids"]):
+            if item != 0 and "Evolved" in id_to_itemname[item]:
+                item_name = id_to_itemname[item][8:]
+                new_id = itemname_to_id[item_name]
+                x["item_ids"][idx] = new_id
 
     print(
         len(god_data),
@@ -154,8 +163,16 @@ def main(
         ]
     )
 
-    item_max = np.max(item_data, axis=0)
-    todelete = [idx for idx in range(len(item_max)) if item_max[idx] == 0]
+    # find out how many times the item was purchased
+    item_count = np.sum(item_data, axis=0)
+
+    # remove any item purchased less than 3% of the time
+    # TODO make the purchase percentage cutoff an arg
+    todelete = [
+        idx
+        for idx in range(len(item_count))
+        if item_count[idx] < (item_data.shape[0] * 0.03)
+    ]
     item_data = np.delete(item_data, todelete, axis=1)
 
     item_data_ids = [x for idx, x in enumerate(item_ids) if idx not in todelete]
