@@ -133,3 +133,6 @@ SmiteData-master
 
 # vscode
 .vscode
+
+# Jupyter Notebooks
+*.ipynb
