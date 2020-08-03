@@ -13,7 +13,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
 
-from smitebuilder.etl import get_godmap, get_itemmap
+from smitebuilder import etl
 
 
 def parse_args(args: List[str]) -> Namespace:
@@ -52,19 +52,16 @@ def main(
     probability_score_cutoff: float,
 ) -> Optional[List[MainReturn]]:
     # NOTE assumes laid out as in SmiteData repo
-    godmap = get_godmap(os.path.join(path_to_data, "gods.json"))
-    itemmap = get_itemmap(os.path.join(path_to_data, "items.json"))
-    item_ids = list(itemmap.keys())
+    godmap = etl.get_godmap(os.path.join(path_to_data, "gods.json"))
+    itemmap = etl.get_itemmap(os.path.join(path_to_data, "items.json"))
 
     queue_path = queue + "_match_data"
 
-    with open(
+    raw_match_data = etl.get_matchdata(
         os.path.join(
             path_to_data, queue_path, str(godmap.inverse[target_god]) + ".json",
-        ),
-        "r",
-    ) as infile:
-        god_data = json.loads(infile.readline())
+        )
+    )
 
     # filter god data by conquest rank plat and above
     filtered_god_data = [

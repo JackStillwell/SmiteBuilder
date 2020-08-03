@@ -6,7 +6,7 @@ The ETL module performs all disk-to-memory conversions required by SmiteBuilder.
 This includes reformatting data as well as data pre-processing.
 """
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, NamedTuple, Union
 
 import json
 
@@ -135,9 +135,14 @@ def extract_win_label(raw_data: List[RawMatchData]) -> np.ndarray:
     ).reshape((len(raw_data), 1))
 
 
+class ItemData(NamedTuple):
+    item_matrix: np.ndarray
+    feature_list: List[int]
+
+
 def extract_item_data(
     raw_data: List[RawMatchData], itemmap: bidict(Dict[int, str])
-) -> Tuple[np.ndarray, List[int]]:
+) -> ItemData:
     """Takes raw match data and extracts the item data required for DT and BNB classification.
 
     Args:
@@ -146,11 +151,16 @@ def extract_item_data(
                                           Name.
 
     Returns:
-        Tuple[np.ndarray, List[int]]: A tuple containing a (# of matches) by (# relevant items) matrix containing
-                                      item data from each match and a list mapping feature (column) index to item
-                                      id.
+        ItemData: A tuple containing a (# of matches) by (# relevant items) matrix containing
+                  item data from each match and a list mapping feature (column) index to item
+                  id.
     """
 
-    return np.array(
-        [1 if x["win_status"] == "Winner" else 0 for x in raw_data]
-    ).reshape((len(raw_data), 1))
+    item_data = np.array(
+        [
+            [1 if item_id in x["item_ids"] else 0 for item_id in itemmap.keys()]
+            for x in raw_data
+        ]
+    )
+
+    return ItemData(item_matrix=item_data, feature_list=list(itemmap.keys()))
