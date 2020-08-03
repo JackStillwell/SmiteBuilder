@@ -14,6 +14,7 @@ def trace_decision(
     tree, node: int, local_trace: List[int], traces: List[List[int]], trace_length: int
 ):
     """
+    NEEDS DOCSTRING
     """
 
     # this stops if we hit a leaf node

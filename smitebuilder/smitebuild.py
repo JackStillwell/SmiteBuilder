@@ -40,6 +40,10 @@ def filter_data_by_player_skill(
 
 
 def make_smitebuilds(builds: List[List[int]], num_core: int) -> List[SmiteBuild]:
+    """
+    NEEDS DOCSTRING
+    """
+
     smitebuilds = []
 
     for i, build_i in enumerate(builds):
