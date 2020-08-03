@@ -64,6 +64,12 @@ def get_matchdata(path: str) -> List[RawMatchData]:
         raw_data: List[RawMatchData] = json.loads("".join(infile.readlines()))
 
     relevant_information = [
+        "conquest_tier",
+        "duel_tier",
+        "joust_tier",
+        "rank_stat_conquest",
+        "rank_stat_duel",
+        "rank_stat_joust",
         "assists",
         "damage_mitigated",
         "damage_player",
