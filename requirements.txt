@@ -19,4 +19,4 @@ scipy==1.4.1              # via scikit-learn
 sklearn==0.0              # via -r requirements.in
 typing-extensions==3.7.4.2  # via yarl
 websockets==8.1           # via discord.py
-yarl==1.5.0               # via aiohttp
+yarl==1.5.1               # via aiohttp
