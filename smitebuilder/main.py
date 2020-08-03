@@ -13,6 +13,8 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
 
+from smitebuilder.etl import get_godmap, get_itemmap
+
 
 def parse_args(args: List[str]) -> Namespace:
     parser = ArgumentParser()
@@ -50,21 +52,15 @@ def main(
     probability_score_cutoff: float,
 ) -> Optional[List[MainReturn]]:
     # NOTE assumes laid out as in SmiteData repo
-    with open(os.path.join(path_to_data, "gods.json"), "r") as infile:
-        gods = json.loads(infile.readline())
-        godname_to_id = {x["Name"]: x["id"] for x in gods}
-
-    with open(os.path.join(path_to_data, "items.json"), "r") as infile:
-        items = json.loads(infile.readline())
-        id_to_itemname = {x["ItemId"]: x["DeviceName"] for x in items}
-        itemname_to_id = {x["DeviceName"]: x["ItemId"] for x in items}
-        item_ids = [x["ItemId"] for x in items]
+    godmap = get_godmap(os.path.join(path_to_data, "gods.json"))
+    itemmap = get_itemmap(os.path.join(path_to_data, "items.json"))
+    item_ids = list(itemmap.keys())
 
     queue_path = queue + "_match_data"
 
     with open(
         os.path.join(
-            path_to_data, queue_path, str(godname_to_id[target_god]) + ".json",
+            path_to_data, queue_path, str(godmap.inverse[target_god]) + ".json",
         ),
         "r",
     ) as infile:
