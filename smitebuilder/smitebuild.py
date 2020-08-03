@@ -6,13 +6,14 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from smitebuilder.smiteinfo import RankTier
-from typing import List, Set
+from typing import Dict, List, Set
 from dataclasses import dataclass
+from bidict import bidict
 
 import numpy as np
 
-from smitebuilder.etl import RawMatchData
+from smitebuilder.etl import RawMatchData, ItemData
+from smitebuilder.smiteinfo import RankTier
 
 
 @dataclass
@@ -41,12 +42,20 @@ def filter_data_by_player_skill(
     return [x["conquest_tier"] >= conquest_tier_cutoff for x in raw_data]
 
 
-def fuse_evolved_items(raw_data: List[RawMatchData]):
-    """Combines 
+def fuse_evolution_items(item_data: ItemData, itemmap: bidict(Dict[int, str])):
+    """Fuses the "Evolved" and "Unevolved" versions of items into their unevolved version.
+    NOTE: Works in-place.
 
     Args:
-        raw_data (List[RawMatchData]): [description]
+        item_data (ItemData): A tuple containing a (# of matches) by (# relevant items) matrix
+                              containing item data from each match and a list mapping feature
+                              (column) index to item id.
+        itemmap (bidict(Dict[int, str])): A bidirectional map, with primary bindings from ID to
+                                          Name.
+
     """
+
+    evolved_ids = [k for k, v in itemmap.items() if "Evolved" in v]
     return None
 
 
