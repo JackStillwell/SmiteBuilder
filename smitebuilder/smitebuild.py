@@ -10,6 +10,8 @@ from smitebuilder.smiteinfo import RankTier
 from typing import List, Set
 from dataclasses import dataclass
 
+import numpy as np
+
 from smitebuilder.etl import RawMatchData
 
 
@@ -37,6 +39,29 @@ def filter_data_by_player_skill(
 
     # TODO improve this filtering
     return [x["conquest_tier"] >= conquest_tier_cutoff for x in raw_data]
+
+
+def fuse_evolved_items(raw_data: List[RawMatchData]):
+    """Combines 
+
+    Args:
+        raw_data (List[RawMatchData]): [description]
+    """
+    return None
+
+
+def prune_item_data(item_data: np.ndarray) -> List[bool]:
+    """Takes a matrix of item data and returns a boolean list indicating which items to include in
+    the features.
+
+    Args:
+        item_data (np.ndarray): A matrix of item data, where each row is an observation and each
+                                column is a feature representing a purchasable item.
+
+    Returns:
+        List[bool]: A list of booleans indicating which features are to be kept.
+    """
+    return []
 
 
 def make_smitebuilds(builds: List[List[int]], num_core: int) -> List[SmiteBuild]:

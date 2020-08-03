@@ -3,17 +3,16 @@ import sys
 import os
 
 from argparse import ArgumentParser, Namespace
-from typing import List, Set, Tuple, Optional
+from typing import List, Tuple, Optional
 from copy import deepcopy
 from collections import namedtuple
-from dataclasses import dataclass
 
 import numpy as np
 from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
 
-from smitebuilder import etl
+from smitebuilder import etl, smitebuild, smiteinfo, dt_tracer
 
 
 def parse_args(args: List[str]) -> Namespace:
@@ -31,12 +30,6 @@ def parse_args(args: List[str]) -> Namespace:
     parser.add_argument("--probability_score_cutoff", "-psc", default=0.7)
 
     return parser.parse_known_args(args)[0]
-
-
-@dataclass
-class SmiteBuild:
-    core: Set[int]
-    optional: Set[int]
 
 
 ReadableSmiteBuild = namedtuple("ReadableSmiteBuild", ["core", "optional"])
@@ -63,20 +56,22 @@ def main(
         )
     )
 
-    # filter god data by conquest rank plat and above
-    filtered_god_data = [
-        x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff
-    ]
-    while len(filtered_god_data) < 500:
-        conquest_tier_cutoff -= 1
-        filtered_god_data = [
-            x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff
-        ]
+    returnval = []
 
-        if conquest_tier_cutoff < 0:
-            break
+    while not returnval:
+        filtered_god_data = smitebuild.filter_data_by_player_skill(
+            raw_match_data, conquest_tier_cutoff
+        )
 
-    god_data = filtered_god_data
+        while len(filtered_god_data) < 500:
+            conquest_tier_cutoff -= 1
+            filtered_god_data = [
+                x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff
+            ]
+
+            if conquest_tier_cutoff < 0:
+                print("Not enough data")
+                return None
 
     # edit the god data so that all evolved items are the base items
     for x in god_data:
