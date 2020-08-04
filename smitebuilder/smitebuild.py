@@ -6,8 +6,7 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from typing import Dict, List, Set
-from dataclasses import dataclass
+from typing import Dict, NamedTuple, List, Set
 from bidict import bidict
 
 import numpy as np
@@ -16,8 +15,7 @@ from smitebuilder.etl import RawMatchData, ItemData
 from smitebuilder.smiteinfo import RankTier
 
 
-@dataclass
-class SmiteBuild:
+class SmiteBuild(NamedTuple):
     core: Set[int]
     optional: Set[int]
 
