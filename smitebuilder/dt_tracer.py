@@ -13,8 +13,17 @@ from typing import List
 def trace_decision(
     tree, node: int, local_trace: List[int], traces: List[List[int]], trace_length: int
 ):
-    """
-    NEEDS DOCSTRING
+    """Traces a decision tree to discover which features are important for classification.
+
+    Args:
+        tree ([type]): The sklearn Tree object. 
+        node (int): The index of the current node.
+        local_trace (List[int]): The current instance's local version of the trace.
+        traces (List[List[int]]): The completed traces.
+        trace_length (int): The minimum trace length to be considered complete.
+
+    Returns:
+        The "traces" parameter will be filled by running this method.
     """
 
     # this stops if we hit a leaf node

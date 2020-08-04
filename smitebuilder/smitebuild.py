@@ -56,6 +56,11 @@ def fuse_evolution_items(item_data: ItemData, itemmap: bidict(Dict[int, str])):
     """
 
     evolved_ids = [k for k, v in itemmap.items() if "Evolved" in v]
+    for idx, val in enumerate(item_data.feature_list):
+        if val in evolved_ids:
+            affected_rows = item_data.item_matrix[:, idx] == 1
+            item_data.item_matrix[affected_rows, itemmap.inverse[itemmap[val][8:]]] = 1
+            item_data.item_matrix[affected_rows, idx] = 0
     return None
 
 
@@ -70,18 +75,34 @@ def prune_item_data(item_data: np.ndarray) -> List[bool]:
     Returns:
         List[bool]: A list of booleans indicating which features are to be kept.
     """
-    return []
+
+    item_count = np.sum(item_data.item_matrix, axis=0)
+    todelete = [
+        idx
+        for idx in range(len(item_count))
+        if item_count[idx] < (item_data.item_matrix.shape[0] * 0.03)
+    ]
+    return [
+        True if x in todelete else False for x in range(item_data.item_matrix.shape[1])
+    ]
 
 
-def make_smitebuilds(builds: List[List[int]], num_core: int) -> List[SmiteBuild]:
-    """
-    NEEDS DOCSTRING
+def make_smitebuilds(traces: List[List[int]], num_core: int) -> List[SmiteBuild]:
+    """Transform decision tree traces into SMITE item builds.
+
+    Args:
+        traces (List[List[int]]): A list of all the traces of the decision tree.
+        num_core (int): The minimum number of items similar between multiple builds to be
+                        considered a "core".
+
+    Returns:
+        List[SmiteBuild]: A list of builds with "core" and "optional" items.
     """
 
     smitebuilds = []
 
-    for i, build_i in enumerate(builds):
-        for j, build_j in enumerate(builds):
+    for i, build_i in enumerate(traces):
+        for j, build_j in enumerate(traces):
             if i == j:
                 continue
 
