@@ -1,11 +1,17 @@
-import json
+"""
+Jack Stillwell
+4 August 2020
+
+This is the main interface for SmiteBuilder, providing a complete pipeline for generation of
+builds for deities given match information.
+"""
+
 import sys
 import os
 
 from argparse import ArgumentParser, Namespace
-from typing import List, Tuple, Optional
+from typing import List, NamedTuple, Tuple, Optional
 from copy import deepcopy
-from collections import namedtuple
 
 import numpy as np
 from sklearn.linear_model import SGDClassifier
@@ -32,8 +38,15 @@ def parse_args(args: List[str]) -> Namespace:
     return parser.parse_known_args(args)[0]
 
 
-ReadableSmiteBuild = namedtuple("ReadableSmiteBuild", ["core", "optional"])
-MainReturn = namedtuple("MainReturn", ["build", "dt_rank", "bnb_rank"])
+class ReadableSmiteBuild(NamedTuple):
+    core: List[str]
+    optional: List[str]
+
+
+class MainReturn(NamedTuple):
+    build: ReadableSmiteBuild
+    dt_rank: float
+    bnb_rank: float
 
 
 def main(
@@ -288,43 +301,6 @@ def main(
         print("bnb_rank:", smitebuild[1])
 
     return returnval
-
-
-def create_builds(tree, node: int, local_build: List[int], builds: List[List[int]]):
-    # this stops if we hit a leaf node
-    if tree.children_left[node] == tree.children_right[node]:
-        return None
-
-    # this stops if we flesh out a build
-    if len(local_build) > 4:
-        # print('appending build', local_build)
-        builds.append(local_build)
-        return None
-
-    create_builds(tree, tree.children_left[node], deepcopy(local_build), builds)
-
-    local_build += [tree.feature[node]]
-    create_builds(tree, tree.children_right[node], deepcopy(local_build), builds)
-
-
-def make_smitebuilds(builds: List[List[int]], num_core: int) -> List[SmiteBuild]:
-    smitebuilds = []
-
-    for i, build_i in enumerate(builds):
-        for j, build_j in enumerate(builds):
-            if i == j:
-                continue
-
-            potential_core = set(build_i) & set(build_j)
-            if len(potential_core) >= num_core:
-                optional = set(build_i) ^ set(build_j)
-                try:
-                    idx = [x.core for x in smitebuilds].index(potential_core)
-                    smitebuilds[idx].optional |= optional
-                except ValueError:
-                    smitebuilds.append(SmiteBuild(potential_core, optional))
-
-    return smitebuilds
 
 
 if __name__ == "__main__":

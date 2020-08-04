@@ -116,3 +116,46 @@ def make_smitebuilds(traces: List[List[int]], num_core: int) -> List[SmiteBuild]
                     smitebuilds.append(SmiteBuild(potential_core, optional))
 
     return smitebuilds
+
+
+def convert_build_to_observation(
+    build: List[int], feature_list: List[int]
+) -> np.ndarray:
+    """Converts a list of SMITE ids into the corresponding observation.
+
+    Args:
+        build (List[int]): A list of SMITE item ids.
+        feature_list (List[int]): A list where the index of an item_id corresponds to the feature
+                                  index.
+
+    Returns:
+        np.ndarray: An observation row suitable for model input.
+    """
+
+    return np.array([1 if x in build else 0 for x in feature_list])
+
+
+def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> float:
+    """Takes a SMITE build and returns a confidence rating.
+
+    Args:
+        build (SmiteBuild): A list of core and optional items for a build.
+        feature_list (List[int]): A list where the index of an item_id corresponds to the feature
+                                  index.
+        dt: A trained sklearn DecisionTreeClassifier.
+        bnb: sklearn BernoulliNB.
+
+    Returns:
+        float: A float between 0 and 1 representing the confidence the models show in the build.
+    """
+
+    # TODO update this to better correspond to overall confidence rather than just core build
+    dt_proba = 0.0
+    bnb_proba = 0.0
+
+    observation = convert_build_to_observation(list(build.core), feature_list)
+
+    dt_proba += dt.predict_proba(observation)
+    bnb_proba += bnb.predict_proba(observation)
+
+    return (dt_proba * 0.66) + (bnb_proba + 0.34)
