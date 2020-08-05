@@ -23,7 +23,7 @@ def trace_decision(
         trace_length (int): The minimum trace length to be considered complete.
 
     Returns:
-        The "traces" parameter will be filled by running this method.
+        The "traces" parameter will be filled by running this method. 
     """
 
     left_node = tree.children_left[node]

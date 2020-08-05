@@ -18,20 +18,13 @@ tree = Tree(
 )
 
 
-def test_trace_decision_complete():
-    """Ensure that traces are correct and that all are found given a great enough trace length."""
+def test_trace_decision_correct():
+    """Ensure that traces are correct"""
     traces = []
-    trace_decision(tree, 0, [], traces, 4)
+    trace_decision(tree, 0, [], traces, 3)
 
     expected_traces = [
-        [0, 1, 2, 7],
-        [0, 1, 3, 8],
-        [0, 1, 4, 9],
-        [0, 1, 4, 10],
-        [0, 2, 5, 11],
-        [0, 2, 5, 12],
-        [0, 2, 6, 13],
-        [0, 2, 6, 14],
+        [0, 2, 6],
     ]
 
     assert len(traces) == len(expected_traces)
@@ -39,16 +32,11 @@ def test_trace_decision_complete():
 
 
 def test_trace_decision_length():
-    """Ensure that traces are limited to the correct length"""
+    """Ensure that traces are held to the correct length"""
     traces = []
-    trace_decision(tree, 0, [], traces, 3)
+    trace_decision(tree, 0, [], traces, 2)
 
-    expected_traces = [
-        [0, 1, 3],
-        [0, 1, 4],
-        [0, 2, 5],
-        [0, 2, 6],
-    ]
+    expected_traces = [[0, 2], [1, 4], [0, 5]]
 
     assert len(traces) == len(expected_traces)
     assert all([x in expected_traces for x in traces])
