@@ -85,22 +85,28 @@ def prune_item_data(item_data: np.ndarray) -> List[bool]:
     ]
 
 
-def make_smitebuilds(traces: List[List[int]], num_core: int) -> List[SmiteBuild]:
+def make_smitebuilds(
+    traces: List[List[int]], num_core: int, feature_list: List[int]
+) -> List[SmiteBuild]:
     """Transform decision tree traces into SMITE item builds.
 
     Args:
         traces (List[List[int]]): A list of all the traces of the decision tree.
         num_core (int): The minimum number of items similar between multiple builds to be
                         considered a "core".
+        feature_list (List[int]): A list mapping feature id (col idx) to item id.
 
     Returns:
         List[SmiteBuild]: A list of builds with "core" and "optional" items.
     """
 
+    # first, convert all feature ids to item ids
+    raw_builds = [[feature_list[x] for x in trace] for trace in traces]
+
     smitebuilds = []
 
-    for i, build_i in enumerate(traces):
-        for j, build_j in enumerate(traces):
+    for i, build_i in enumerate(raw_builds):
+        for j, build_j in enumerate(raw_builds):
             if i == j:
                 continue
 

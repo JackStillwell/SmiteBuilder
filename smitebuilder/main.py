@@ -11,14 +11,15 @@ import os
 
 from argparse import ArgumentParser, Namespace
 from typing import List, NamedTuple, Tuple, Optional
-from copy import deepcopy
+from itertools import compress
 
 import numpy as np
 from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
 
-from smitebuilder import etl, smitebuild, smiteinfo, dt_tracer
+from smitebuilder import etl, smiteinfo, dt_tracer
+from smitebuilder.smitebuild import *
 
 
 def parse_args(args: List[str]) -> Namespace:
@@ -45,8 +46,7 @@ class ReadableSmiteBuild(NamedTuple):
 
 class MainReturn(NamedTuple):
     build: ReadableSmiteBuild
-    dt_rank: float
-    bnb_rank: float
+    confidence: float
 
 
 def main(
@@ -58,249 +58,92 @@ def main(
     probability_score_cutoff: float,
 ) -> Optional[List[MainReturn]]:
     # NOTE assumes laid out as in SmiteData repo
-    godmap = etl.get_godmap(os.path.join(path_to_data, "gods.json"))
-    itemmap = etl.get_itemmap(os.path.join(path_to_data, "items.json"))
+    god_map = etl.get_godmap(os.path.join(path_to_data, "gods.json"))
+    item_map = etl.get_itemmap(os.path.join(path_to_data, "items.json"))
 
     queue_path = queue + "_match_data"
 
     raw_match_data = etl.get_matchdata(
         os.path.join(
-            path_to_data, queue_path, str(godmap.inverse[target_god]) + ".json",
+            path_to_data, queue_path, str(god_map.inverse[target_god]) + ".json",
         )
     )
 
     returnval = []
+
+    performance_data = etl.extract_performance_data(raw_match_data)
+    win_label = etl.extract_win_label(raw_match_data)
+    item_data = etl.extract_item_data(raw_match_data, item_map)
+
+    # prune and consolidate item data
+    item_mask = prune_item_data(item_data.item_matrix)
+    preprocessed_item_data = ItemData(
+        item_matrix=fuse_evolution_items(
+            np.delete(item_data.item_matrix, item_mask, axis=1), item_map
+        ),
+        feature_list=list(compress(item_data.feature_list, item_mask)),
+    )
+    item_data = preprocessed_item_data
 
     while not returnval:
-        filtered_god_data = smitebuild.filter_data_by_player_skill(
-            raw_match_data, conquest_tier_cutoff
+
+        # add mechanic to relax the filter
+        skill_mask = filter_data_by_player_skill(
+            raw_match_data, smiteinfo.RankTier(conquest_tier_cutoff)
         )
 
-        while len(filtered_god_data) < 500:
-            conquest_tier_cutoff -= 1
-            filtered_god_data = [
-                x for x in god_data if x["conquest_tier"] > conquest_tier_cutoff
-            ]
+        item_mask = prune_item_data(item_data)
 
-            if conquest_tier_cutoff < 0:
-                print("Not enough data")
-                return None
+        sgd_classifier = SGDClassifier(max_iter=1000, random_state=0)
+        sgd_classifier.fit(performance_data, win_label)
 
-    # edit the god data so that all evolved items are the base items
-    for x in god_data:
-        for idx, item in enumerate(x["item_ids"]):
-            if item != 0 and "Evolved" in id_to_itemname[item]:
-                item_name = id_to_itemname[item][8:]
-                new_id = itemname_to_id[item_name]
-                x["item_ids"][idx] = new_id
+        print("sgd_score:", sgd_classifier.score(performance_data, win_label))
 
-    print(
-        len(god_data),
-        "matches found with a conquest_tier cutoff of",
-        conquest_tier_cutoff,
-    )
+        new_winlabel = sgd_classifier.predict(performance_data)
 
-    npdata = np.array(
-        [
-            np.divide(
-                np.array(
-                    [
-                        x["assists"],
-                        x["damage_mitigated"],
-                        x["damage_player"],
-                        x["damage_taken"],
-                        x["deaths"],
-                        x["healing"],
-                        x["healing_player_self"],
-                        x["kills_player"],
-                        x["structure_damage"],
-                    ]
+        dt_classifier = DecisionTreeClassifier(
+            criterion="entropy", max_features=1, random_state=0,
+        )
+        dt_classifier.fit(item_data.item_matrix, new_winlabel)
+
+        print("dt_score:", dt_classifier.score(item_data.item_matrix, new_winlabel))
+
+        bnb_classifier = BernoulliNB()
+        bnb_classifier.fit(item_data.item_matrix, new_winlabel)
+
+        print("bnb_score:", bnb_classifier.score(item_data.item_matrix, new_winlabel))
+
+        traces = []
+        dt_tracer.trace_decision(dt_classifier.tree_, 0, [], traces, 5)
+
+        # turn the traces into smitebuilds
+        smitebuilds = make_smitebuilds(traces, 4, item_data.feature_list)
+
+        # rate the smitebuilds
+        smitebuild_confidence = [
+            (
+                x,
+                rate_smitebuild(
+                    x, item_data.feature_list, dt_classifier, bnb_classifier
                 ),
-                x["match_time_minutes"],
             )
-            for x in god_data
-        ]
-    )
-    npdata_normalized = npdata / np.array(
-        [x if x != 0 else 1 for x in npdata.max(axis=0)]
-    )
-    npdata_winlabel = np.array(
-        [1 if x["win_status"] == "Winner" else 0 for x in god_data]
-    )
-
-    npdn_shape: Tuple[int, int] = npdata_normalized.shape
-    print("pruning", npdn_shape[0], "rows for non-nan validity")
-
-    valid_rows = [
-        (x, y)
-        for x, y in zip(npdata_normalized, npdata_winlabel)
-        if np.all(np.isfinite(x)) and np.all(np.isfinite(y))
-    ]
-
-    print(len(valid_rows), "rows remain")
-
-    if not valid_rows:
-        print("No valid rows remain. Exiting...")
-        return None
-
-    temp = list(zip(*valid_rows))
-    npdata_normalized = np.array(list(temp[0]))
-    npdata_winlabel = np.array(list(temp[1]))
-
-    sgd_classifier = SGDClassifier(max_iter=1000, random_state=0)
-    sgd_classifier.fit(npdata_normalized, npdata_winlabel)
-
-    print("sgd_score:", sgd_classifier.score(npdata_normalized, npdata_winlabel))
-
-    # NOTE original design included a clustering step but after research
-    #        I believe simply predicting based on SGD is more than sufficient
-
-    new_winlabel = sgd_classifier.predict(npdata_normalized)
-
-    item_data = np.array(
-        [
-            [1 if item_id in x["item_ids"] else 0 for item_id in item_ids]
-            for x in god_data
-        ]
-    )
-
-    # find out how many times the item was purchased
-    item_count = np.sum(item_data, axis=0)
-
-    # remove any item purchased less than 3% of the time
-    # TODO make the purchase percentage cutoff an arg
-    todelete = [
-        idx
-        for idx in range(len(item_count))
-        if item_count[idx] < (item_data.shape[0] * 0.03)
-    ]
-    item_data = np.delete(item_data, todelete, axis=1)
-
-    item_data_ids = [x for idx, x in enumerate(item_ids) if idx not in todelete]
-
-    dt_classifier = DecisionTreeClassifier(
-        criterion="entropy", max_features=1, random_state=0,
-    )
-    dt_classifier.fit(item_data, new_winlabel)
-
-    print("dt_score:", dt_classifier.score(item_data, new_winlabel))
-
-    bnb_classifier = BernoulliNB()
-    bnb_classifier.fit(item_data, new_winlabel)
-
-    print("bnb_score:", bnb_classifier.score(item_data, new_winlabel))
-
-    print("Constructing builds from tree...")
-    builds = []
-    create_builds(dt_classifier.tree_, 0, [], builds)
-
-    possible_builds = np.array(
-        [[1 if idx in x else 0 for idx in range(len(item_data_ids))] for x in builds]
-    )
-
-    if not possible_builds.size > 0:
-        print("No possible builds found. Exiting...")
-        return None
-
-    dt_predictions = dt_classifier.predict_proba(possible_builds)
-
-    possible_builds = [
-        x
-        for idx, x in enumerate(possible_builds)
-        if dt_predictions[idx][1] > probability_score_cutoff
-    ]
-    while not possible_builds:
-        probability_score_cutoff -= 0.05
-        possible_builds = [
-            x
-            for idx, x in enumerate(possible_builds)
-            if dt_predictions[idx][1] > probability_score_cutoff
-        ]
-
-        if probability_score_cutoff < probability_score_limit:
-            print(
-                "Probability cutoff reached",
-                probability_score_cutoff,
-                ". No viable builds found. Exiting...",
-            )
-            return None
-
-    print(
-        len(possible_builds),
-        "possible build paths found with a success probability cutoff of",
-        probability_score_cutoff,
-    )
-
-    feature_builds = [
-        [idx for idx, x in enumerate(build) if x == 1] for build in possible_builds
-    ]
-
-    core_size = 4
-    smitebuilds = make_smitebuilds(feature_builds, core_size)
-    while not smitebuilds:
-        core_size -= 1
-        smitebuilds = make_smitebuilds(feature_builds, core_size)
-
-        if core_size < 1:
-            print("No core found. Exiting...")
-            return None
-
-    print(len(smitebuilds), "possible builds found with a core_size of", core_size)
-
-    possible_smitebuilds = np.array(
-        [
-            [1 if idx in x.core else 0 for idx in range(len(item_data_ids))]
             for x in smitebuilds
-        ]
-    )
-
-    if not possible_smitebuilds.size > 0:
-        print("Exiting...")
-        return None
-
-    bnb_ranking = bnb_classifier.predict_proba(possible_smitebuilds)
-    dt_ranking = dt_classifier.predict_proba(possible_smitebuilds)
-
-    smitebuild_ranks = [
-        (x, bnb_ranking[idx][1], dt_ranking[idx][1])
-        for idx, x in enumerate(smitebuilds)
-    ]
-    smitebuild_ranks.sort(key=lambda x: x[1], reverse=True)
-
-    smitebuild_ranks_pruned = [
-        x for x in smitebuild_ranks if x[2] > probability_score_cutoff
-    ][:3]
-    while len(smitebuild_ranks_pruned) < 3:
-        probability_score_cutoff -= 0.05
-        smitebuild_ranks_pruned = [
-            x for x in smitebuild_ranks if x[2] > probability_score_cutoff
         ][:3]
 
-        if probability_score_cutoff < 0:
-            break
+        for sb_c in smitebuild_confidence:
+            elem = MainReturn(
+                build=ReadableSmiteBuild(
+                    core=[item_map[x] for x in sb_c[0].core],
+                    optional=[item_map[x] for x in sb_c[0].optional],
+                ),
+                confidence=sb_c[1],
+            )
+            returnval.append(elem)
+            print("core:", [item_map[x] for x in sb_c[0].core])
+            print("optional:", [item_map[x] for x in sb_c[0].optional])
+            print("confidence:", sb_c[1])
 
-    returnval = []
-    for smitebuild in smitebuild_ranks_pruned:
-        elem = MainReturn(
-            build=ReadableSmiteBuild(
-                core=[id_to_itemname[item_data_ids[x]] for x in smitebuild[0].core],
-                optional=[
-                    id_to_itemname[item_data_ids[x]] for x in smitebuild[0].optional
-                ],
-            ),
-            dt_rank=smitebuild[2],
-            bnb_rank=smitebuild[1],
-        )
-        returnval.append(elem)
-        print("core:", [id_to_itemname[item_data_ids[x]] for x in smitebuild[0].core])
-        print(
-            "optional:",
-            [id_to_itemname[item_data_ids[x]] for x in smitebuild[0].optional],
-        )
-        print("dt_rank:", smitebuild[2])
-        print("bnb_rank:", smitebuild[1])
-
-    return returnval
+        return returnval
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 Jack Stillwell
 3 August 2020
 
-The Decision Tree Configuration Builder module contains the code necessary to generate
+The Decision Tree Tracer module contains the code necessary to generate
 recommended configurations from a trained decision tree.
 """
 
@@ -36,7 +36,7 @@ def trace_decision(
             return None
 
     # this stops if we hit the trace length
-    if len(local_trace) > 4:
+    if len(local_trace) == trace_length:
         traces.append(local_trace)
         return None
 
