@@ -1,0 +1,10 @@
+[
+    {
+        "ItemId": 1,
+        "DeviceName": "one"
+    },
+    {
+        "ItemId": 2,
+        "DeviceName": "two"
+    }
+]

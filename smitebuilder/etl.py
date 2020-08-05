@@ -6,7 +6,7 @@ The ETL module performs all disk-to-memory conversions required by SmiteBuilder.
 This includes reformatting data as well as data pre-processing.
 """
 
-from typing import Dict, List, Optional, NamedTuple, Union
+from typing import Dict, List, Optional, Union
 from dataclasses import dataclass
 
 import json
