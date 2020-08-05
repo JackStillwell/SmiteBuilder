@@ -40,4 +40,3 @@ def test_trace_decision_length():
 
     assert len(traces) == len(expected_traces)
     assert all([x in expected_traces for x in traces])
-

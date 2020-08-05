@@ -13,7 +13,8 @@ from typing import List
 def trace_decision(
     tree, node: int, local_trace: List[int], traces: List[List[int]], trace_length: int
 ):
-    """Traces a decision tree to discover which features are important for classification.
+    """Traces a binary decision tree to discover which features are important for classification.
+    Only features which are present are included in the trace.
 
     Args:
         tree ([type]): The sklearn Tree object. 
