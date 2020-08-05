@@ -37,10 +37,11 @@ def filter_data_by_player_skill(
     """
 
     # TODO improve this filtering
-    return [x["conquest_tier"] >= conquest_tier_cutoff for x in raw_data]
+    tokeep = [x["conquest_tier"] >= conquest_tier_cutoff for x in raw_data]
+    return tokeep
 
 
-def fuse_evolution_items(item_data: ItemData, itemmap: bidict(Dict[int, str])):
+def fuse_evolution_items(item_data: ItemData, itemmap: Dict[int, str]):
     """Fuses the "Evolved" and "Unevolved" versions of items into their unevolved version.
     NOTE: Works in-place.
 
@@ -48,7 +49,7 @@ def fuse_evolution_items(item_data: ItemData, itemmap: bidict(Dict[int, str])):
         item_data (ItemData): A tuple containing a (# of matches) by (# relevant items) matrix
                               containing item data from each match and a list mapping feature
                               (column) index to item id.
-        itemmap (bidict(Dict[int, str])): A bidirectional map, with primary bindings from ID to
+        itemmap (Dict[int, str]): A bidirectional map, with primary bindings from ID to
                                           Name.
 
     """
@@ -57,32 +58,33 @@ def fuse_evolution_items(item_data: ItemData, itemmap: bidict(Dict[int, str])):
     for idx, val in enumerate(item_data.feature_list):
         if val in evolved_ids:
             affected_rows = item_data.item_matrix[:, idx] == 1
-            item_data.item_matrix[affected_rows, itemmap.inverse[itemmap[val][8:]]] = 1
+            item_data.item_matrix[
+                affected_rows,
+                item_data.feature_list.index(itemmap.inverse[itemmap[val][8:]]),
+            ] = 1
             item_data.item_matrix[affected_rows, idx] = 0
     return None
 
 
-def prune_item_data(item_data: np.ndarray) -> List[bool]:
+def prune_item_data(item_matrix: np.ndarray) -> List[bool]:
     """Takes a matrix of item data and returns a boolean list indicating which items to include in
     the features.
 
     Args:
-        item_data (np.ndarray): A matrix of item data, where each row is an observation and each
+        item_matrix (np.ndarray): A matrix of item data, where each row is an observation and each
                                 column is a feature representing a purchasable item.
 
     Returns:
         List[bool]: A list of booleans indicating which features are to be kept.
     """
 
-    item_count = np.sum(item_data.item_matrix, axis=0)
-    todelete = [
+    item_count = np.sum(item_matrix, axis=0)
+    tokeep = [
         idx
         for idx in range(len(item_count))
-        if item_count[idx] < (item_data.item_matrix.shape[0] * 0.03)
+        if item_count[idx] > (item_matrix.shape[0] * 0.03)
     ]
-    return [
-        True if x in todelete else False for x in range(item_data.item_matrix.shape[1])
-    ]
+    return [True if x in tokeep else False for x in range(item_matrix.shape[1])]
 
 
 def make_smitebuilds(

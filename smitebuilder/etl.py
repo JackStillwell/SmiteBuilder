@@ -7,6 +7,7 @@ This includes reformatting data as well as data pre-processing.
 """
 
 from typing import Dict, List, Optional, NamedTuple, Union
+from dataclasses import dataclass
 
 import json
 
@@ -19,29 +20,29 @@ from sklearn.preprocessing import StandardScaler
 RawMatchData = Dict[str, Optional[Union[int, str, float, List[int]]]]
 
 
-def get_godmap(path: str) -> bidict(Dict[int, str]):
+def get_godmap(path: str) -> Dict[int, str]:
     """Takes path to json and returns bidirectional map.
 
     Args:
         path (str): The full path to the return of the getgods (json) endpoint of the SMITE API.
 
     Returns:
-        bidict(Dict[int, str]): A bidirectional map, with primary bindings from ID to Name.
+        Dict[int, str]: A bidirectional map, with primary bindings from ID to Name.
     """
     with open(path, "r") as infile:
         gods = json.loads("".join(infile.readlines()))
 
-    return bidict({x["Name"]: x["id"] for x in gods})
+    return bidict({x["id"]: x["Name"] for x in gods})
 
 
-def get_itemmap(path: str) -> bidict(Dict[int, str]):
+def get_itemmap(path: str) -> Dict[int, str]:
     """Takes path to json and returns bidirectional map.
 
     Args:
         path (str): The full path to the return of the getitems (json) endpoint of the SMITE API.
 
     Returns:
-        bidict(Dict[int, str]): A bidirectional map, with primary bindings from ID to Name.
+        Dict[int, str]: A bidirectional map, with primary bindings from ID to Name.
     """
     with open(path, "r") as infile:
         items = json.loads("".join(infile.readlines()))
@@ -81,6 +82,7 @@ def get_matchdata(path: str) -> List[RawMatchData]:
         "structure_damage",
         "win_status",
         "item_ids",
+        "match_time_minutes",
     ]
 
     return [{k: v for k, v in x.items() if k in relevant_information} for x in raw_data]
@@ -120,8 +122,8 @@ def extract_performance_data(raw_data: List[RawMatchData]) -> np.ndarray:
     )
 
     # normalize the data (improves SGD classification)
-    scaler = StandardScaler()
-    scaler.fit_transform(performance_matrix, copy=False)
+    scaler = StandardScaler(copy=False)
+    scaler.fit_transform(performance_matrix)
 
     return performance_matrix
 
@@ -141,19 +143,20 @@ def extract_win_label(raw_data: List[RawMatchData]) -> np.ndarray:
     ).reshape((len(raw_data), 1))
 
 
-class ItemData(NamedTuple):
+@dataclass
+class ItemData:
     item_matrix: np.ndarray
     feature_list: List[int]
 
 
 def extract_item_data(
-    raw_data: List[RawMatchData], itemmap: bidict(Dict[int, str])
+    raw_data: List[RawMatchData], itemmap: Dict[int, str]
 ) -> ItemData:
     """Takes raw match data and extracts the item data required for DT and BNB classification.
 
     Args:
         raw_data (List[RawMatchData]): The raw dictionary-style information extracted from json.
-        itemmap (bidict(Dict[int, str])): A bidirectional map, with primary bindings from ID to
+        itemmap (Dict[int, str]): A bidirectional map, with primary bindings from ID to
                                           Name.
 
     Returns:

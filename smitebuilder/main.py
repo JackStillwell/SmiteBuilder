@@ -25,16 +25,12 @@ from smitebuilder.smitebuild import *
 def parse_args(args: List[str]) -> Namespace:
     parser = ArgumentParser()
 
+    parser.add_argument("--datapath", "-d", required=True, type=str)
     parser.add_argument(
-        "--datapath", "-d", required=True,
+        "--queue", "-q", required=True, choices=["conquest", "joust", "duel"], type=str
     )
-    parser.add_argument(
-        "--queue", "-q", required=True, choices=["conquest", "joust", "duel"]
-    )
-    parser.add_argument("--god", "-g", required=True)
-    parser.add_argument("--conquest_tier", "-ct", default=15)
-    parser.add_argument("--probability_score_limit", "-psl", default=0.5)
-    parser.add_argument("--probability_score_cutoff", "-psc", default=0.7)
+    parser.add_argument("--god", "-g", required=True, type=str)
+    parser.add_argument("--conquest_tier", "-ct", default=15, type=int)
 
     return parser.parse_known_args(args)[0]
 
@@ -50,12 +46,7 @@ class MainReturn(NamedTuple):
 
 
 def main(
-    path_to_data: str,
-    queue: str,
-    target_god: str,
-    conquest_tier_cutoff: int,
-    probability_score_limit: float,
-    probability_score_cutoff: float,
+    path_to_data: str, queue: str, target_god: str, conquest_tier_cutoff: int,
 ) -> Optional[List[MainReturn]]:
     # NOTE assumes laid out as in SmiteData repo
     god_map = etl.get_godmap(os.path.join(path_to_data, "gods.json"))
@@ -76,11 +67,10 @@ def main(
     item_data = etl.extract_item_data(raw_match_data, item_map)
 
     # prune and consolidate item data
+    fuse_evolution_items(item_data, item_map)
     item_mask = prune_item_data(item_data.item_matrix)
     preprocessed_item_data = ItemData(
-        item_matrix=fuse_evolution_items(
-            np.delete(item_data.item_matrix, item_mask, axis=1), item_map
-        ),
+        item_matrix=np.delete(item_data.item_matrix, item_mask, axis=1),
         feature_list=list(compress(item_data.feature_list, item_mask)),
     )
     item_data = preprocessed_item_data
@@ -149,10 +139,5 @@ def main(
 if __name__ == "__main__":
     args = parse_args(sys.argv)
     main(
-        args.datapath,
-        args.queue,
-        args.god,
-        int(args.conquest_tier),
-        float(args.probability_score_limit),
-        float(args.probability_score_cutoff),
+        args.datapath, args.queue, args.god, args.conquest_tier,
     )
