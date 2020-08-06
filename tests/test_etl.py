@@ -23,3 +23,12 @@ def test_get_itemmap():
     actual = get_itemmap("tests/test_itemmap.json")
 
     assert expected == actual
+
+
+def test_get_matchdata():
+    """Checking that fields are imported correctly and only the relevant information is included"""
+    expected = [{"joust_tier": 1,}, {"deaths": 2, "damage_player": 16,}]
+
+    actual = get_matchdata("tests/test_matchdata.json")
+
+    assert expected == actual
