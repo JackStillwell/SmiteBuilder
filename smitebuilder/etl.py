@@ -103,7 +103,6 @@ def extract_performance_data(raw_data: List[RawMatchData]) -> np.ndarray:
             np.divide(
                 np.array(
                     [
-                        1,  # bias feature
                         x["assists"],
                         x["damage_mitigated"],
                         x["damage_player"],
@@ -124,6 +123,11 @@ def extract_performance_data(raw_data: List[RawMatchData]) -> np.ndarray:
     # normalize the data (improves SGD classification)
     scaler = StandardScaler(copy=False)
     scaler.fit_transform(performance_matrix)
+
+    # add a bias feature (must be after scaling)
+    performance_matrix = np.concatenate(
+        (np.ones((performance_matrix.shape[0], 1)), performance_matrix), axis=1
+    )
 
     return performance_matrix
 
