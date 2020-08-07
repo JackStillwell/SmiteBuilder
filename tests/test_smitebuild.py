@@ -84,9 +84,9 @@ def test_make_smitebuilds():
 
 def test_rate_smitebuild():
     dt_mock = mock.MagicMock()
-    dt_mock.predict_proba.return_value = 1
+    dt_mock.predict_proba.return_value = [[0, 1]]
     bnb_mock = mock.MagicMock()
-    bnb_mock.predict_proba.return_value = 0
+    bnb_mock.predict_proba.return_value = [[1, 0]]
 
     build = SmiteBuild(core={12, 78}, optional={90, 56})
     feature_list = [12, 34, 56, 78, 90]

@@ -69,11 +69,8 @@ def main(
     # prune and consolidate item data
     fuse_evolution_items(item_data, item_map)
     item_mask = prune_item_data(item_data.item_matrix)
-    preprocessed_item_data = ItemData(
-        item_matrix=np.delete(item_data.item_matrix, item_mask, axis=1),
-        feature_list=list(compress(item_data.feature_list, item_mask)),
-    )
-    item_data = preprocessed_item_data
+    item_data.item_matrix = item_data.item_matrix[:, item_mask]
+    item_data.feature_list = list(compress(item_data.feature_list, item_mask))
 
     while not returnval:
 
@@ -82,10 +79,12 @@ def main(
             raw_match_data, smiteinfo.RankTier(conquest_tier_cutoff)
         )
 
-        item_mask = prune_item_data(item_data)
+        performance_data = performance_data[skill_mask, :]
+        win_label = win_label[skill_mask, :]
+        item_data.item_matrix = item_data.item_matrix[skill_mask, :]
 
         sgd_classifier = SGDClassifier(max_iter=1000, random_state=0)
-        sgd_classifier.fit(performance_data, win_label)
+        sgd_classifier.fit(performance_data, win_label.reshape((win_label.shape[0],)))
 
         print("sgd_score:", sgd_classifier.score(performance_data, win_label))
 
@@ -118,9 +117,11 @@ def main(
                 ),
             )
             for x in smitebuilds
-        ][:3]
+        ]
 
-        for sb_c in smitebuild_confidence:
+        smitebuild_confidence.sort(key=lambda x: x[1], reverse=True)
+
+        for sb_c in smitebuild_confidence[:3]:
             elem = MainReturn(
                 build=ReadableSmiteBuild(
                     core=[item_map[x] for x in sb_c[0].core],

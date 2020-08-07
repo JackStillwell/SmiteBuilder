@@ -142,7 +142,9 @@ def _convert_build_to_observation(
         np.ndarray: An observation row suitable for model input.
     """
 
-    return np.array([1 if x in build else 0 for x in feature_list])
+    return np.array([1 if x in build else 0 for x in feature_list]).reshape(
+        (1, len(feature_list))
+    )
 
 
 def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> float:
@@ -165,7 +167,9 @@ def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> floa
 
     observation = _convert_build_to_observation(list(build.core), feature_list)
 
-    dt_proba += dt.predict_proba(observation)
-    bnb_proba += bnb.predict_proba(observation)
+    dt_proba += dt.predict_proba(observation)[0][1]
+    bnb_proba += bnb.predict_proba(observation)[0][1]
 
-    return (dt_proba * 0.66) + (bnb_proba * 0.34)
+    returnval = (dt_proba * 0.66) + (bnb_proba * 0.34)
+
+    return returnval
