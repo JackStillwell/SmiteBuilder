@@ -65,13 +65,16 @@ def fuse_evolution_items(item_data: ItemData, itemmap: Dict[int, str]):
     return None
 
 
-def prune_item_data(item_matrix: np.ndarray) -> List[bool]:
+def prune_item_data(item_matrix: np.ndarray, frequency_cutoff=0.03) -> List[bool]:
     """Takes a matrix of item data and returns a boolean list indicating which items to include in
     the features.
 
     Args:
         item_matrix (np.ndarray): A matrix of item data, where each row is an observation and each
                                 column is a feature representing a purchasable item.
+        frequency_cutoff (float): A percentage decimal between 0 (0%) and 1 (100%) indicating the
+                                  percentage of observations a feature must be present in.
+                                  Default: 0.03 (3%)
 
     Returns:
         List[bool]: A list of booleans indicating which features are to be kept.
@@ -81,7 +84,7 @@ def prune_item_data(item_matrix: np.ndarray) -> List[bool]:
     tokeep = [
         idx
         for idx in range(len(item_count))
-        if item_count[idx] > (item_matrix.shape[0] * 0.03)
+        if item_count[idx] > (item_matrix.shape[0] * frequency_cutoff)
     ]
     return [True if x in tokeep else False for x in range(item_matrix.shape[1])]
 

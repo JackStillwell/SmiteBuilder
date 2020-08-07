@@ -10,7 +10,7 @@ import sys
 import os
 
 from argparse import ArgumentParser, Namespace
-from typing import List, NamedTuple, Tuple, Optional
+from typing import List, NamedTuple, Optional
 from itertools import compress
 
 import numpy as np
