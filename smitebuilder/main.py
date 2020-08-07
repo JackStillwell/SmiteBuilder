@@ -13,7 +13,6 @@ from argparse import ArgumentParser, Namespace
 from typing import List, NamedTuple, Optional
 from itertools import compress
 
-import numpy as np
 from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
@@ -82,6 +81,8 @@ def main(
         performance_data = performance_data[skill_mask, :]
         win_label = win_label[skill_mask, :]
         item_data.item_matrix = item_data.item_matrix[skill_mask, :]
+
+        print("Currently using", performance_data.shape[0], "matches")
 
         sgd_classifier = SGDClassifier(max_iter=1000, random_state=0)
         sgd_classifier.fit(performance_data, win_label.reshape((win_label.shape[0],)))

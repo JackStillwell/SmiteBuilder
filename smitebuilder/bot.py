@@ -1,5 +1,5 @@
 import discord
-import easy_smitebuilds
+import smitebuilder
 import os
 
 client = discord.Client()
@@ -21,7 +21,7 @@ async def on_message(message):
 
         builds = None
         try:
-            builds = easy_smitebuilds.main(datapath, queue, god, 15, 0.5, 0.7)
+            builds = smitebuilder.main(datapath, queue, god, 15)
 
         except KeyError:
             await message.channel.send(
@@ -36,10 +36,9 @@ async def on_message(message):
         else:
             send_str = ""
             for smitebuild in builds:
-                send_str += "dt_rank: " + str(smitebuild.dt_rank) + "\n"
-                send_str += "bnb_rank: " + str(smitebuild.bnb_rank) + "\n"
                 send_str += "core: " + str(smitebuild.build.core) + "\n"
                 send_str += "optional: " + str(smitebuild.build.optional) + "\n"
+                send_str += "confidence: " + str(smitebuild.confidence) + "\n"
                 send_str += "\n"
 
             await message.channel.send(send_str)
