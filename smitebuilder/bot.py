@@ -1,5 +1,5 @@
 import discord
-import smitebuilder
+from smitebuilder.main import main
 import os
 
 client = discord.Client()
@@ -21,7 +21,7 @@ async def on_message(message):
 
         builds = None
         try:
-            builds = smitebuilder.main(datapath, queue, god, 15)
+            builds = main(datapath, queue, god, 15)
 
         except KeyError:
             await message.channel.send(
