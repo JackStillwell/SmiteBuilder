@@ -1,6 +1,7 @@
 from smitebuilder.smitebuild import *
 
 from typing import cast
+from unittest import mock
 
 from bidict import bidict
 import numpy as np
@@ -65,4 +66,32 @@ def test_prune_item_data():
 
 
 def test_make_smitebuilds():
-    pass
+    traces = [
+        [0, 3, 4],
+        [0, 3, 2],
+        [0, 1, 4],
+    ]
+    feature_list = [12, 34, 56, 78, 90]
+
+    result = make_smitebuilds(traces, 2, feature_list)
+    expected = [
+        SmiteBuild(core={12, 78}, optional={90, 56}),
+        SmiteBuild(core={12, 90}, optional={34, 78}),
+    ]
+
+    assert expected == result
+
+
+def test_rate_smitebuild():
+    dt_mock = mock.MagicMock()
+    dt_mock.predict_proba.return_value = 1
+    bnb_mock = mock.MagicMock()
+    bnb_mock.predict_proba.return_value = 0
+
+    build = SmiteBuild(core={12, 78}, optional={90, 56})
+    feature_list = [12, 34, 56, 78, 90]
+
+    expected = 0.66
+    result = rate_smitebuild(build, feature_list, dt_mock, bnb_mock)
+
+    assert expected == result

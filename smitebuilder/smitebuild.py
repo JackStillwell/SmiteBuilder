@@ -6,7 +6,8 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from typing import Dict, NamedTuple, List, Set
+from typing import Dict, List, Set
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -14,7 +15,8 @@ from smitebuilder.etl import RawMatchData, ItemData
 from smitebuilder.smiteinfo import RankTier
 
 
-class SmiteBuild(NamedTuple):
+@dataclass
+class SmiteBuild:
     core: Set[int]
     optional: Set[int]
 
@@ -126,7 +128,7 @@ def make_smitebuilds(
     return smitebuilds
 
 
-def convert_build_to_observation(
+def _convert_build_to_observation(
     build: List[int], feature_list: List[int]
 ) -> np.ndarray:
     """Converts a list of SMITE ids into the corresponding observation.
@@ -161,9 +163,9 @@ def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> floa
     dt_proba = 0.0
     bnb_proba = 0.0
 
-    observation = convert_build_to_observation(list(build.core), feature_list)
+    observation = _convert_build_to_observation(list(build.core), feature_list)
 
     dt_proba += dt.predict_proba(observation)
     bnb_proba += bnb.predict_proba(observation)
 
-    return (dt_proba * 0.66) + (bnb_proba + 0.34)
+    return (dt_proba * 0.66) + (bnb_proba * 0.34)
