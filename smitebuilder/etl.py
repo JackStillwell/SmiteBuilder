@@ -47,6 +47,10 @@ def get_itemmap(path: str) -> Dict[int, str]:
     with open(path, "r") as infile:
         items = json.loads("".join(infile.readlines()))
 
+    for item in items:
+        if item["ItemTier"] == 4 and not item["DeviceName"].startswith("Evolved"):
+            item["DeviceName"] = "Evolved " + item["DeviceName"]
+
     return bidict({x["ItemId"]: x["DeviceName"] for x in items})
 
 

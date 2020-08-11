@@ -18,6 +18,8 @@ def test_get_itemmap():
     expected = {
         1: "one",
         2: "two",
+        3: "Evolved three",
+        4: "Evolved four",
     }
 
     actual = get_itemmap("tests/test_itemmap.json")
