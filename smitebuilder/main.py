@@ -19,6 +19,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
 
 from smitebuilder import etl, smiteinfo, dt_tracer
+
 from smitebuilder.smitebuild import (
     rate_smitebuild,
     make_smitebuilds,
@@ -26,7 +27,6 @@ from smitebuilder.smitebuild import (
     prune_item_data,
     filter_data_by_player_skill
 )
-
 from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuild
 
 
@@ -80,7 +80,6 @@ def main(
 
 
     raw_match_data = etl.get_matchdata(match_data_path)
-
     returnval = []
 
     performance_data = etl.extract_performance_data(raw_match_data)

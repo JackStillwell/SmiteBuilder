@@ -44,7 +44,7 @@ def test_get_matchdata():
         {"joust_tier": 1, "match_time_minutes": 10},
         {"deaths": 2, "damage_player": 16, "match_time_minutes": 10}
     ]
-
+    
     actual = get_matchdata("tests/test_matchdata.json")
 
     assert expected == actual
