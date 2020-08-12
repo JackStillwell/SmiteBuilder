@@ -16,6 +16,7 @@ from bidict import bidict
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
+from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuild
 
 RawMatchData = Dict[str, Optional[Union[int, str, float, List[int]]]]
 
@@ -46,6 +47,10 @@ def get_itemmap(path: str) -> Dict[int, str]:
     """
     with open(path, "r") as infile:
         items = json.loads("".join(infile.readlines()))
+
+    for item in items:
+        if item["ItemTier"] == 4 and not item["DeviceName"].startswith("Evolved"):
+            item["DeviceName"] = "Evolved " + item["DeviceName"]
 
     return bidict({x["ItemId"]: x["DeviceName"] for x in items})
 
@@ -84,8 +89,11 @@ def get_matchdata(path: str) -> List[RawMatchData]:
         "item_ids",
         "match_time_minutes",
     ]
+    
+    raw_data = [{k: v for k, v in x.items() if k in relevant_information} for x in raw_data]
+    raw_data = [x for x in raw_data if x["match_time_minutes"] > 0]
 
-    return [{k: v for k, v in x.items() if k in relevant_information} for x in raw_data]
+    return raw_data
 
 
 def extract_performance_data(raw_data: List[RawMatchData]) -> np.ndarray:
@@ -177,3 +185,21 @@ def extract_item_data(
     )
 
     return ItemData(item_matrix=item_data, feature_list=list(itemmap.keys()))
+
+
+def store_build(build: List[MainReturn], path: str):
+    with open(path, "w") as outfile:
+        outfile.write(json.dumps(build))
+
+
+def load_build(path: str) -> List[MainReturn]:
+    with open(path, "r") as infile:
+        raw_list = json.loads("".join(infile.readlines()))
+
+    return [MainReturn(
+        build=ReadableSmiteBuild(
+            core=x[0][0],
+            optional=x[0][1],
+        ),
+        confidence=x[1],
+    ) for x in raw_list]

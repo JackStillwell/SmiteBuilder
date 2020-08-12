@@ -1,10 +1,17 @@
 [
     {
         "joust_tier": 1,
-        "extravaganza": "one"
+        "extravaganza": "one",
+        "match_time_minutes": 10
     },
     {
         "deaths": 2,
-        "damage_player": 16
+        "damage_player": 16,
+        "match_time_minutes": 10
+    },
+    {
+        "deaths": 2,
+        "damage_player": 16,
+        "match_time_minutes": 0
     }
 ]

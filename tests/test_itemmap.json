@@ -1,10 +1,22 @@
 [
     {
         "ItemId": 1,
-        "DeviceName": "one"
+        "DeviceName": "one",
+        "ItemTier": 3
     },
     {
         "ItemId": 2,
-        "DeviceName": "two"
+        "DeviceName": "two",
+        "ItemTier": 3
+    },
+    {
+        "ItemId": 3,
+        "DeviceName": "Evolved three",
+        "ItemTier": 4
+    },
+    {
+        "ItemId": 4,
+        "DeviceName": "four",
+        "ItemTier": 4
     }
 ]

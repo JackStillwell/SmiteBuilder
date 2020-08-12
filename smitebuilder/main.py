@@ -6,11 +6,12 @@ This is the main interface for SmiteBuilder, providing a complete pipeline for g
 builds for deities given match information.
 """
 
+from smitebuilder.etl import load_build
 import sys
 import os
 
 from argparse import ArgumentParser, Namespace
-from typing import List, NamedTuple, Optional
+from typing import List, Optional
 from itertools import compress
 
 from sklearn.linear_model import SGDClassifier
@@ -18,7 +19,15 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
 
 from smitebuilder import etl, smiteinfo, dt_tracer
-from smitebuilder.smitebuild import *
+
+from smitebuilder.smitebuild import (
+    rate_smitebuild,
+    make_smitebuilds,
+    fuse_evolution_items,
+    prune_item_data,
+    filter_data_by_player_skill
+)
+from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuild
 
 
 def parse_args(args: List[str]) -> Namespace:
@@ -30,22 +39,19 @@ def parse_args(args: List[str]) -> Namespace:
     )
     parser.add_argument("--god", "-g", required=True, type=str)
     parser.add_argument("--conquest_tier", "-ct", default=15, type=int)
+    parser.add_argument("--store_build", "-s", default=None , type=str)
+    parser.add_argument("--silent", default=False, choices=[True, False], type=bool)
 
     return parser.parse_known_args(args)[0]
 
 
-class ReadableSmiteBuild(NamedTuple):
-    core: List[str]
-    optional: List[str]
-
-
-class MainReturn(NamedTuple):
-    build: ReadableSmiteBuild
-    confidence: float
-
-
 def main(
-    path_to_data: str, queue: str, target_god: str, conquest_tier_cutoff: int,
+    path_to_data: str,
+    queue: str,
+    target_god: str,
+    conquest_tier_cutoff: int,
+    store_build: Optional[str],
+    silent: bool,
 ) -> Optional[List[MainReturn]]:
     # NOTE assumes laid out as in SmiteData repo
     god_map = etl.get_godmap(os.path.join(path_to_data, "gods.json"))
@@ -53,12 +59,28 @@ def main(
 
     queue_path = queue + "_match_data"
 
-    raw_match_data = etl.get_matchdata(
-        os.path.join(
-            path_to_data, queue_path, str(god_map.inverse[target_god]) + ".json",
-        )
+    match_data_path = os.path.join(
+        path_to_data, queue_path, str(god_map.inverse[target_god]) + ".json",
     )
 
+    # test if build exists or needs to be generated
+    if store_build:
+        build_path = os.path.join(
+            path_to_data, queue + "_builds", target_god + ".json"
+        )
+        if os.path.isfile(build_path):
+            build_time = os.path.getmtime(build_path)
+            data_time = os.path.getmtime(match_data_path)
+
+            # if the build is less than one day older than the data
+            if (build_time - data_time) < (60*60*24):
+                build = load_build(build_path)
+                if not silent:
+                    print(build)
+                return build
+
+
+    raw_match_data = etl.get_matchdata(match_data_path)
     returnval = []
 
     performance_data = etl.extract_performance_data(raw_match_data)
@@ -82,12 +104,14 @@ def main(
         win_label = win_label[skill_mask, :]
         item_data.item_matrix = item_data.item_matrix[skill_mask, :]
 
-        print("Currently using", performance_data.shape[0], "matches")
+        if not silent:
+            print("Currently using", performance_data.shape[0], "matches")
 
         sgd_classifier = SGDClassifier(max_iter=1000, random_state=0)
         sgd_classifier.fit(performance_data, win_label.reshape((win_label.shape[0],)))
 
-        print("sgd_score:", sgd_classifier.score(performance_data, win_label))
+        if not silent:
+            print("sgd_score:", sgd_classifier.score(performance_data, win_label))
 
         new_winlabel = sgd_classifier.predict(performance_data)
 
@@ -96,12 +120,14 @@ def main(
         )
         dt_classifier.fit(item_data.item_matrix, new_winlabel)
 
-        print("dt_score:", dt_classifier.score(item_data.item_matrix, new_winlabel))
+        if not silent:
+            print("dt_score:", dt_classifier.score(item_data.item_matrix, new_winlabel))
 
         bnb_classifier = BernoulliNB()
         bnb_classifier.fit(item_data.item_matrix, new_winlabel)
 
-        print("bnb_score:", bnb_classifier.score(item_data.item_matrix, new_winlabel))
+        if not silent:
+            print("bnb_score:", bnb_classifier.score(item_data.item_matrix, new_winlabel))
 
         traces = []
         dt_tracer.trace_decision(dt_classifier.tree_, 0, [], traces, 5)
@@ -131,9 +157,17 @@ def main(
                 confidence=sb_c[1],
             )
             returnval.append(elem)
-            print("core:", [item_map[x] for x in sb_c[0].core])
-            print("optional:", [item_map[x] for x in sb_c[0].optional])
-            print("confidence:", sb_c[1])
+
+            if not silent:
+                print("core:", [item_map[x] for x in sb_c[0].core])
+                print("optional:", [item_map[x] for x in sb_c[0].optional])
+                print("confidence:", sb_c[1])
+
+        if store_build:
+            etl.store_build(
+                returnval, 
+                os.path.join(path_to_data, store_build, target_god + ".json")
+            )
 
         return returnval
 
@@ -141,5 +175,10 @@ def main(
 if __name__ == "__main__":
     args = parse_args(sys.argv)
     main(
-        args.datapath, args.queue, args.god, args.conquest_tier,
+        args.datapath,
+        args.queue,
+        args.god,
+        args.conquest_tier,
+        args.store_build,
+        args.silent
     )
