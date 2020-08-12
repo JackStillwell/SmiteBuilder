@@ -38,12 +38,13 @@ def parse_args(args: List[str]) -> Namespace:
     )
     parser.add_argument("--god", "-g", required=True, type=str)
     parser.add_argument("--conquest_tier", "-ct", default=15, type=int)
+    parser.add_argument("--store_build", "-s", default=None , type=str)
 
     return parser.parse_known_args(args)[0]
 
 
 def main(
-    path_to_data: str, queue: str, target_god: str, conquest_tier_cutoff: int,
+    path_to_data: str, queue: str, target_god: str, conquest_tier_cutoff: int, store_build: Optional[str]
 ) -> Optional[List[MainReturn]]:
     # NOTE assumes laid out as in SmiteData repo
     god_map = etl.get_godmap(os.path.join(path_to_data, "gods.json"))
@@ -133,11 +134,14 @@ def main(
             print("optional:", [item_map[x] for x in sb_c[0].optional])
             print("confidence:", sb_c[1])
 
+        if store_build:
+            etl.store_build(returnval, os.path.join(store_build, target_god + ".json"))
+
         return returnval
 
 
 if __name__ == "__main__":
     args = parse_args(sys.argv)
     main(
-        args.datapath, args.queue, args.god, args.conquest_tier,
+        args.datapath, args.queue, args.god, args.conquest_tier, args.store_build
     )

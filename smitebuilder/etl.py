@@ -185,19 +185,19 @@ def extract_item_data(
     return ItemData(item_matrix=item_data, feature_list=list(itemmap.keys()))
 
 
-def store_build(build: MainReturn, path: str):
+def store_build(build: List[MainReturn], path: str):
     with open(path, "w") as outfile:
         outfile.write(json.dumps(build))
 
 
-def load_build(path: str) -> MainReturn:
+def load_build(path: str) -> List[MainReturn]:
     with open(path, "r") as infile:
-        raw_dict = json.loads("".join(infile.readlines()))
+        raw_list = json.loads("".join(infile.readlines()))
 
-    return MainReturn(
+    return [MainReturn(
         build=ReadableSmiteBuild(
-            core=raw_dict[0][0],
-            optional=raw_dict[0][1],
+            core=x[0][0],
+            optional=x[0][1],
         ),
-        confidence=raw_dict[1],
-    )
+        confidence=x[1],
+    ) for x in raw_list]

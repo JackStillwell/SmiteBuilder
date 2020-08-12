@@ -121,8 +121,8 @@ def test_store_load_build():
         confidence=90.0,
     )
 
-    store_build(build_to_store, "test_storeloadbuild.json")
+    store_build([build_to_store], "test_storeloadbuild.json")
 
-    result = load_build("test_storeloadbuild.json")
+    result = load_build("test_storeloadbuild.json")[0]
 
     assert result == build_to_store
