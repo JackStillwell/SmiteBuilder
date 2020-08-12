@@ -39,7 +39,10 @@ def parse_args(args: List[str]) -> Namespace:
     )
     parser.add_argument("--god", "-g", required=True, type=str)
     parser.add_argument("--conquest_tier", "-ct", default=15, type=int)
-    parser.add_argument("--store_build", "-s", default=None , type=str)
+    parser.add_argument(
+        "--store_build", "-s", default=False,
+        choices=[True, False], type=bool
+    )
     parser.add_argument("--silent", default=False, choices=[True, False], type=bool)
 
     return parser.parse_known_args(args)[0]
@@ -50,7 +53,7 @@ def main(
     queue: str,
     target_god: str,
     conquest_tier_cutoff: int,
-    store_build: Optional[str],
+    store_build: bool,
     silent: bool,
 ) -> Optional[List[MainReturn]]:
     # NOTE assumes laid out as in SmiteData repo
@@ -166,7 +169,7 @@ def main(
         if store_build:
             etl.store_build(
                 returnval, 
-                os.path.join(path_to_data, store_build, target_god + ".json")
+                os.path.join(path_to_data, queue + "_builds", target_god + ".json")
             )
 
         return returnval

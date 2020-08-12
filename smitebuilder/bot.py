@@ -21,7 +21,7 @@ async def on_message(message):
 
         builds = None
         try:
-            builds = main(datapath, queue, god, 15)
+            builds = main(datapath, queue, god, 15, "builds", True)
 
         except KeyError:
             await message.channel.send(
