@@ -91,7 +91,10 @@ def get_matchdata(path: str) -> List[RawMatchData]:
         "match_time_minutes",
     ]
 
-    return [{k: v for k, v in x.items() if k in relevant_information} for x in raw_data]
+    raw_data = [{k: v for k, v in x.items() if k in relevant_information} for x in raw_data]
+    raw_data = [x for x in raw_data if x["match_time_minutes"] > 0]
+
+    return raw_data
 
 
 def extract_performance_data(raw_data: List[RawMatchData]) -> np.ndarray:
@@ -103,6 +106,8 @@ def extract_performance_data(raw_data: List[RawMatchData]) -> np.ndarray:
     Returns:
         np.ndarray: A (# of matches) by 10 matrix containing performance data from each match.
     """
+
+    
     # extract the required data
     performance_matrix = np.array(
         [

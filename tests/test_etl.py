@@ -40,7 +40,10 @@ def test_get_itemmap():
 
 def test_get_matchdata():
     """Checking that fields are imported correctly and only the relevant information is included"""
-    expected = [{"joust_tier": 1,}, {"deaths": 2, "damage_player": 16,}]
+    expected = [
+        {"joust_tier": 1, "match_time_minutes": 10},
+        {"deaths": 2, "damage_player": 16, "match_time_minutes": 10}
+    ]
 
     actual = get_matchdata("tests/test_matchdata.json")
 
