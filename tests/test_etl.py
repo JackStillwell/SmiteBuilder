@@ -1,6 +1,17 @@
-import bidict
+from bidict import bidict
+import numpy as np
 
-from smitebuilder.etl import *
+from smitebuilder.etl import (
+    get_godmap,
+    get_itemmap,
+    get_matchdata,
+    extract_performance_data,
+    extract_win_label,
+    extract_item_data,
+    store_build,
+    load_build,
+)
+from smitebuilder.main import MainReturn, ReadableSmiteBuild 
 
 
 def test_get_godmap():
@@ -99,3 +110,19 @@ def test_extract_item_data():
         np.array_equal(expected_matrix, result.item_matrix)
         and expected_feature_list == result.feature_list
     )
+
+
+def test_store_load_build():
+    build_to_store = MainReturn(
+        build=ReadableSmiteBuild(
+            core=["item_one", "item_two"],
+            optional=["item_three"]
+        ),
+        confidence=90.0,
+    )
+
+    store_build(build_to_store, "test_storeloadbuild.json")
+
+    result = load_build("test_storeloadbuild.json")
+
+    assert result == build_to_store

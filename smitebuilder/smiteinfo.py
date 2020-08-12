@@ -7,6 +7,17 @@ and the data returned by the SMITE API and understood by the models.
 """
 
 from enum import IntEnum
+from typing import List, NamedTuple
+
+
+class ReadableSmiteBuild(NamedTuple):
+    core: List[str]
+    optional: List[str]
+
+
+class MainReturn(NamedTuple):
+    build: ReadableSmiteBuild
+    confidence: float
 
 
 class RankTier(IntEnum):

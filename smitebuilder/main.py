@@ -18,7 +18,15 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
 
 from smitebuilder import etl, smiteinfo, dt_tracer
-from smitebuilder.smitebuild import *
+from smitebuilder.smitebuild import (
+    rate_smitebuild,
+    make_smitebuilds,
+    fuse_evolution_items,
+    prune_item_data,
+    filter_data_by_player_skill
+)
+
+from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuild
 
 
 def parse_args(args: List[str]) -> Namespace:
@@ -32,16 +40,6 @@ def parse_args(args: List[str]) -> Namespace:
     parser.add_argument("--conquest_tier", "-ct", default=15, type=int)
 
     return parser.parse_known_args(args)[0]
-
-
-class ReadableSmiteBuild(NamedTuple):
-    core: List[str]
-    optional: List[str]
-
-
-class MainReturn(NamedTuple):
-    build: ReadableSmiteBuild
-    confidence: float
 
 
 def main(
