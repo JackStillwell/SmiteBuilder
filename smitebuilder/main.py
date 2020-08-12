@@ -6,6 +6,7 @@ This is the main interface for SmiteBuilder, providing a complete pipeline for g
 builds for deities given match information.
 """
 
+from smitebuilder.etl import load_build
 import sys
 import os
 
@@ -58,11 +59,27 @@ def main(
 
     queue_path = queue + "_match_data"
 
-    raw_match_data = etl.get_matchdata(
-        os.path.join(
-            path_to_data, queue_path, str(god_map.inverse[target_god]) + ".json",
-        )
+    match_data_path = os.path.join(
+        path_to_data, queue_path, str(god_map.inverse[target_god]) + ".json",
     )
+
+    # test if build exists or needs to be generated
+    if store_build:
+        build_path = os.path.join(
+            path_to_data, queue + "_builds", target_god + ".json"
+        )
+        if os.path.isfile(build_path):
+            build_time = os.path.getmtime(build_path)
+            data_time = os.path.getmtime(match_data_path)
+
+            if build_time - data_time < (60*60*24):
+                build = load_build(build_path)
+                if not silent:
+                    print(build)
+                return build
+
+
+    raw_match_data = etl.get_matchdata(match_data_path)
 
     returnval = []
 
