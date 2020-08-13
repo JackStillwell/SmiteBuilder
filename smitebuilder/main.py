@@ -75,8 +75,8 @@ def main(
             build_time = os.path.getmtime(build_path)
             data_time = os.path.getmtime(match_data_path)
 
-            # if the build is less than one day older than the data
-            if (build_time - data_time) < (60*60*24):
+            # if the build is newer than the data
+            if (build_time - data_time) > 0:
                 build = load_build(build_path)
                 if not silent:
                     print(build)
