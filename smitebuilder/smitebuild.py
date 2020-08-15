@@ -6,8 +6,9 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from typing import Dict, List, Set
+from typing import cast, Dict, List, Set
 from dataclasses import dataclass
+from itertools import combinations
 
 import numpy as np
 
@@ -173,3 +174,17 @@ def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> floa
     returnval = (dt_proba * 0.66) + (bnb_proba * 0.34)
 
     return returnval
+
+
+def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
+    num_optional = 6 - len(build.core)
+
+    if len(build.optional) > num_optional:
+        optionals = [
+            cast(Set[int], set(x))
+            for x in combinations(build.optional, num_optional)
+        ]
+    else:
+        optionals = [build.optional]
+    
+    return [build.core | x for x in optionals]

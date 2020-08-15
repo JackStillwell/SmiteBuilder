@@ -6,7 +6,8 @@ from smitebuilder.smitebuild import (
     rate_smitebuild,
     RawMatchData,
     ItemData,
-    SmiteBuild
+    SmiteBuild,
+    gen_all_builds
 )
 
 from smitebuilder.smiteinfo import RankTier
@@ -106,3 +107,20 @@ def test_rate_smitebuild():
     result = rate_smitebuild(build, feature_list, dt_mock, bnb_mock)
 
     assert expected == result
+
+
+def test_gen_all_builds():
+    build = SmiteBuild(core={12, 78, 90, 56}, optional={11, 22, 33, 44})
+
+    expected = [
+        {12, 78, 90, 56, 11, 22},
+        {12, 78, 90, 56, 11, 33},
+        {12, 78, 90, 56, 11, 44},
+        {12, 78, 90, 56, 22, 33},
+        {12, 78, 90, 56, 22, 44},
+        {12, 78, 90, 56, 33, 44},
+    ]
+
+    result = gen_all_builds(build)
+
+    assert len(expected) == len(result) and all([x in expected for x in result])
