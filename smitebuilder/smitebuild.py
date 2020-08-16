@@ -165,8 +165,8 @@ def rate_smitebuild(
                                   index.
         dt: A trained sklearn DecisionTreeClassifier.
         bnb: A trained sklearn BernoulliNB.
-        dt_score (float): The percentage of the final confidence based on the dt_score.
-        bnb_score (float): The percentage of the final confidence based on the bnb_score.
+        dt_percentage (float): The percentage of the final confidence based on the dt_score.
+        bnb_percentage (float): The percentage of the final confidence based on the bnb_score.
         percentile_cutoff (int): The percentile of scores to consider as the "confidence" of a
                                  model.
 
@@ -212,3 +212,18 @@ def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
         optionals = [build.optional]
     
     return [build.core | x for x in optionals]
+
+
+def consolidate_builds(builds: List[SmiteBuild]) -> SmiteBuild:
+    raw_items: List[int] = [z for y in builds for x in gen_all_builds(y) for z in x]
+    unique_items = set(raw_items)
+    item_counts: Dict[int, int] = {x: raw_items.count(x) for x in unique_items}
+
+    core_num = max(item_counts.values())
+    core = {x for x in item_counts.keys() if item_counts[x] == core_num}
+    optional = unique_items - core
+
+    return SmiteBuild(
+        core=core,
+        optional=optional,
+    )

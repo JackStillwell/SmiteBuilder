@@ -21,7 +21,7 @@ from sklearn.naive_bayes import BernoulliNB
 from smitebuilder import etl, smiteinfo, dt_tracer
 
 from smitebuilder.smitebuild import (
-    rate_smitebuild,
+    consolidate_builds, rate_smitebuild,
     make_smitebuilds,
     fuse_evolution_items,
     prune_item_data,
@@ -162,20 +162,30 @@ def main(
 
         smitebuild_confidence.sort(key=lambda x: x[1], reverse=True)
 
-        for sb_c in smitebuild_confidence[:3]:
-            elem = MainReturn(
-                build=ReadableSmiteBuild(
-                    core=[item_map[x] for x in sb_c[0].core],
-                    optional=[item_map[x] for x in sb_c[0].optional],
-                ),
-                confidence=sb_c[1],
-            )
-            returnval.append(elem)
+        final_build = consolidate_builds([x[0] for x in smitebuild_confidence[:3]])
+        final_confidence = rate_smitebuild(
+            final_build,
+            item_data.feature_list,
+            dt_classifier,
+            bnb_classifier,
+            dt_percentage,
+            bnb_percentage,
+            30 
+        )
 
-            if not silent:
-                print("core:", [item_map[x] for x in sb_c[0].core])
-                print("optional:", [item_map[x] for x in sb_c[0].optional])
-                print("confidence:", sb_c[1])
+        elem = MainReturn(
+            build=ReadableSmiteBuild(
+                core=[item_map[x] for x in final_build.core],
+                optional=[item_map[x] for x in final_build.optional],
+            ),
+            confidence=final_confidence,
+        )
+        returnval.append(elem)
+
+        if not silent:
+            print("core:", [item_map[x] for x in final_build.core])
+            print("optional:", [item_map[x] for x in final_build.optional])
+            print("confidence:", final_confidence)
 
         if store_build:
             etl.store_build(

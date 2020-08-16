@@ -7,7 +7,8 @@ from smitebuilder.smitebuild import (
     RawMatchData,
     ItemData,
     SmiteBuild,
-    gen_all_builds
+    gen_all_builds,
+    consolidate_builds
 )
 
 from smitebuilder.smiteinfo import RankTier
@@ -132,3 +133,29 @@ def test_gen_all_builds():
     result = gen_all_builds(build)
 
     assert len(expected) == len(result) and all([x in expected for x in result])
+
+
+def test_consolidate_builds():
+    builds = [
+        SmiteBuild(
+            core={1, 2, 3, 4},
+            optional={5, 6, 7}
+        ),
+        SmiteBuild(
+            core={1, 2, 3, 5},
+            optional={7, 8, 9},
+        ),
+        SmiteBuild(
+            core={7, 6, 5, 4},
+            optional={3, 2, 1},
+        )
+    ]
+
+    expected = SmiteBuild(
+        core={1, 2, 3, 5},
+        optional={4, 6, 7, 8, 9}
+    )
+
+    result = consolidate_builds(builds)
+
+    assert result == expected
