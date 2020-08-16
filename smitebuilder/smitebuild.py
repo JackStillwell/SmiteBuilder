@@ -148,7 +148,14 @@ def _convert_build_to_observation(
     )
 
 
-def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> float:
+def rate_smitebuild(
+    build: SmiteBuild,
+    feature_list: List[int],
+    dt,
+    bnb,
+    dt_percentage: float,
+    bnb_percentage: float,
+) -> float:
     """Takes a SMITE build and returns a confidence rating.
 
     Args:
@@ -156,7 +163,9 @@ def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> floa
         feature_list (List[int]): A list where the index of an item_id corresponds to the feature
                                   index.
         dt: A trained sklearn DecisionTreeClassifier.
-        bnb: sklearn BernoulliNB.
+        bnb: A trained sklearn BernoulliNB.
+        dt_score: The score returned when dt was evaluated on its training data.
+        bnb_score: The score returned when bnb was evaluated on its training data.
 
     Returns:
         float: A float between 0 and 1 representing the confidence the models show in the build.
@@ -165,13 +174,23 @@ def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> floa
     builds = gen_all_builds(build)
     observations = [_convert_build_to_observation(list(x), feature_list) for x in builds]
 
-    dt_probas = [x[1] for x in dt.predict_proba(observations)]
-    bnb_probas = [x[1] for x in bnb.predict_proba(observations)]
+    dt_raw_probas = dt.predict_proba(
+        np.array(observations).reshape(
+            len(observations), len(feature_list)
+        )
+    )
+    dt_probas = [x[1] for x in dt_raw_probas]
+    bnb_raw_probas = bnb.predict_proba(
+        np.array(observations).reshape(
+            len(observations), len(feature_list)
+        )
+    )
+    bnb_probas = [x[1] for x in bnb_raw_probas]
 
-    dt_70 = np.percentile(dt_probas, 70)
-    bnb_70 = np.percentile(bnb_probas, 70)
+    dt_70 = np.percentile(dt_probas, 30)
+    bnb_70 = np.percentile(bnb_probas, 30)
 
-    returnval = (dt_70 * 0.66) + (bnb_70 * 0.34)
+    returnval = (dt_70 * dt_percentage) + (bnb_70 * bnb_percentage)
 
     return returnval
 
