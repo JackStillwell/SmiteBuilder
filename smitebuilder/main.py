@@ -153,7 +153,8 @@ def main(
                     dt_classifier,
                     bnb_classifier,
                     dt_percentage,
-                    bnb_percentage
+                    bnb_percentage,
+                    30 # 70% of the scores must be above this number
                 ),
             )
             for x in smitebuilds

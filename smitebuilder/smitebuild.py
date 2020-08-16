@@ -155,6 +155,7 @@ def rate_smitebuild(
     bnb,
     dt_percentage: float,
     bnb_percentage: float,
+    percentile_cutoff: int,
 ) -> float:
     """Takes a SMITE build and returns a confidence rating.
 
@@ -164,8 +165,10 @@ def rate_smitebuild(
                                   index.
         dt: A trained sklearn DecisionTreeClassifier.
         bnb: A trained sklearn BernoulliNB.
-        dt_score: The score returned when dt was evaluated on its training data.
-        bnb_score: The score returned when bnb was evaluated on its training data.
+        dt_score (float): The percentage of the final confidence based on the dt_score.
+        bnb_score (float): The percentage of the final confidence based on the bnb_score.
+        percentile_cutoff (int): The percentile of scores to consider as the "confidence" of a
+                                 model.
 
     Returns:
         float: A float between 0 and 1 representing the confidence the models show in the build.
@@ -180,8 +183,8 @@ def rate_smitebuild(
     bnb_raw_probas = bnb.predict_proba(observations)
     bnb_probas = [x[1] for x in bnb_raw_probas]
 
-    dt_70 = np.percentile(dt_probas, 30)
-    bnb_70 = np.percentile(bnb_probas, 30)
+    dt_70 = np.percentile(dt_probas, percentile_cutoff)
+    bnb_70 = np.percentile(bnb_probas, percentile_cutoff)
 
     returnval = (dt_70 * dt_percentage) + (bnb_70 * bnb_percentage)
 
