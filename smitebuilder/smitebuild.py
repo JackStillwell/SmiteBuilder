@@ -162,21 +162,30 @@ def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> floa
         float: A float between 0 and 1 representing the confidence the models show in the build.
     """
 
-    # TODO update this to better correspond to overall confidence rather than just core build
-    dt_proba = 0.0
-    bnb_proba = 0.0
+    builds = gen_all_builds(build)
+    observations = [_convert_build_to_observation(list(x), feature_list) for x in builds]
 
-    observation = _convert_build_to_observation(list(build.core), feature_list)
+    dt_probas = [x[1] for x in dt.predict_proba(observations)]
+    bnb_probas = [x[1] for x in bnb.predict_proba(observations)]
 
-    dt_proba += dt.predict_proba(observation)[0][1]
-    bnb_proba += bnb.predict_proba(observation)[0][1]
+    dt_70 = np.percentile(dt_probas, 70)
+    bnb_70 = np.percentile(bnb_probas, 70)
 
-    returnval = (dt_proba * 0.66) + (bnb_proba * 0.34)
+    returnval = (dt_70 * 0.66) + (bnb_70 * 0.34)
 
     return returnval
 
 
 def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
+    """Given a SmiteBuild, return all possible builds containing the core and the required number
+    of optional items to complete a build.
+
+    Args:
+        build (SmiteBuild): A set of core and optional items for a build.
+
+    Returns:
+        List[Set[int]]: A list of sets containing the item ids for each complete build.
+    """
     num_optional = 6 - len(build.core)
 
     if len(build.optional) > num_optional:
