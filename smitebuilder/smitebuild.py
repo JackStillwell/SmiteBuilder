@@ -176,7 +176,7 @@ def rate_smitebuild(
 
     builds = gen_all_builds(build)
     observations = np.vstack(
-        (_convert_build_to_observation(x, feature_list) for x in builds)
+        [_convert_build_to_observation(x, feature_list) for x in builds]
     )
     dt_raw_probas = dt.predict_proba(observations)
     dt_probas = [x[1] for x in dt_raw_probas]
@@ -186,9 +186,10 @@ def rate_smitebuild(
     dt_70 = np.percentile(dt_probas, percentile_cutoff)
     bnb_70 = np.percentile(bnb_probas, percentile_cutoff)
 
-    returnval = (dt_70 * dt_percentage) + (bnb_70 * bnb_percentage)
+    numer = (dt_70 * dt_percentage) + (bnb_70 * bnb_percentage)
+    denom = dt_percentage + bnb_percentage
 
-    return returnval
+    return numer / denom
 
 
 def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
