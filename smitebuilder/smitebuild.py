@@ -186,10 +186,9 @@ def rate_smitebuild(
     dt_70 = np.percentile(dt_probas, percentile_cutoff)
     bnb_70 = np.percentile(bnb_probas, percentile_cutoff)
 
-    numer = (dt_70 * dt_percentage) + (bnb_70 * bnb_percentage)
-    denom = dt_percentage + bnb_percentage
+    return_val = (dt_70 * dt_percentage) + (bnb_70 * bnb_percentage)
 
-    return numer / denom
+    return return_val
 
 
 def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
