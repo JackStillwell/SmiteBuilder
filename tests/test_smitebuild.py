@@ -17,6 +17,7 @@ from unittest import mock
 
 from bidict import bidict
 import numpy as np
+import pytest
 
 
 def test_filter_data_by_player_skill():
@@ -63,18 +64,20 @@ def test_fuse_evolution_items():
     )
 
 
-def test_prune_item_data():
+@pytest.mark.parametrize(
+    "expected,frequency_cutoff", 
+    [
+        ([True, True, True], 0.25),
+        ([False, True, True], 0.5),
+        ([False, False, True], 0.75)
+    ]
+)
+def test_prune_item_data(expected, frequency_cutoff):
     item_matrix = np.array([[0, 0, 1], [0, 1, 1], [1, 1, 1],])
 
-    expected25 = [True, True, True]
-    expected50 = [False, True, True]
-    expected75 = [False, False, True]
+    result = prune_item_data(item_matrix, frequency_cutoff=frequency_cutoff)
 
-    result25 = prune_item_data(item_matrix, frequency_cutoff=0.25)
-    result50 = prune_item_data(item_matrix, frequency_cutoff=0.5)
-    result75 = prune_item_data(item_matrix, frequency_cutoff=0.75)
-
-    assert expected25 == result25 and expected50 == result50 and expected75 == result75
+    assert expected == result
 
 
 def test_make_smitebuilds():
@@ -93,8 +96,14 @@ def test_make_smitebuilds():
 
     assert expected == result
 
-
-def test_rate_smitebuild():
+@pytest.mark.parametrize(
+    "expected,percentile_cutoff", 
+    [
+        (0.65, 30),
+        (0.85, 70),
+    ]
+)
+def test_rate_smitebuild(expected, percentile_cutoff):
     dt_mock = mock.MagicMock()
     dt_mock.predict_proba.return_value = [[0, 1], [1, 0], [0.5, 0.5]]
     bnb_mock = mock.MagicMock()
@@ -103,12 +112,9 @@ def test_rate_smitebuild():
     build = SmiteBuild(core=set(), optional=set())
     feature_list = []
 
-    expected_30 = 0.65
-    expected_70 = 0.85
-    result_30 = rate_smitebuild(build, feature_list, dt_mock, bnb_mock, 0.5, 0.5, 30)
-    result_70 = rate_smitebuild(build, feature_list, dt_mock, bnb_mock, 0.5, 0.5, 70)
+    result = rate_smitebuild(build, feature_list, dt_mock, bnb_mock, 0.5, 0.5, percentile_cutoff)
 
-    assert expected_30 == result_30 and expected_70 == result_70
+    assert expected == result
 
 
 def test_gen_all_builds():
