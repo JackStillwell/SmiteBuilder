@@ -6,8 +6,9 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from typing import Dict, List, Set
+from typing import cast, Dict, List, Set, Union
 from dataclasses import dataclass
+from itertools import combinations
 
 import numpy as np
 
@@ -129,12 +130,12 @@ def make_smitebuilds(
 
 
 def _convert_build_to_observation(
-    build: List[int], feature_list: List[int]
+    build: Union[List[int], Set[int]], feature_list: List[int]
 ) -> np.ndarray:
     """Converts a list of SMITE ids into the corresponding observation.
 
     Args:
-        build (List[int]): A list of SMITE item ids.
+        build (Union[List[int], Set[int]]): A list or set of SMITE item ids.
         feature_list (List[int]): A list where the index of an item_id corresponds to the feature
                                   index.
 
@@ -147,7 +148,15 @@ def _convert_build_to_observation(
     )
 
 
-def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> float:
+def rate_smitebuild(
+    build: SmiteBuild,
+    feature_list: List[int],
+    dt,
+    bnb,
+    dt_percentage: float,
+    bnb_percentage: float,
+    percentile_cutoff: int,
+) -> float:
     """Takes a SMITE build and returns a confidence rating.
 
     Args:
@@ -155,21 +164,51 @@ def rate_smitebuild(build: SmiteBuild, feature_list: List[int], dt, bnb) -> floa
         feature_list (List[int]): A list where the index of an item_id corresponds to the feature
                                   index.
         dt: A trained sklearn DecisionTreeClassifier.
-        bnb: sklearn BernoulliNB.
+        bnb: A trained sklearn BernoulliNB.
+        dt_score (float): The percentage of the final confidence based on the dt_score.
+        bnb_score (float): The percentage of the final confidence based on the bnb_score.
+        percentile_cutoff (int): The percentile of scores to consider as the "confidence" of a
+                                 model.
 
     Returns:
         float: A float between 0 and 1 representing the confidence the models show in the build.
     """
 
-    # TODO update this to better correspond to overall confidence rather than just core build
-    dt_proba = 0.0
-    bnb_proba = 0.0
+    builds = gen_all_builds(build)
+    observations = np.vstack(
+        [_convert_build_to_observation(x, feature_list) for x in builds]
+    )
+    dt_raw_probas = dt.predict_proba(observations)
+    dt_probas = [x[1] for x in dt_raw_probas]
+    bnb_raw_probas = bnb.predict_proba(observations)
+    bnb_probas = [x[1] for x in bnb_raw_probas]
 
-    observation = _convert_build_to_observation(list(build.core), feature_list)
+    dt_70 = np.percentile(dt_probas, percentile_cutoff)
+    bnb_70 = np.percentile(bnb_probas, percentile_cutoff)
 
-    dt_proba += dt.predict_proba(observation)[0][1]
-    bnb_proba += bnb.predict_proba(observation)[0][1]
+    return_val = (dt_70 * dt_percentage) + (bnb_70 * bnb_percentage)
 
-    returnval = (dt_proba * 0.66) + (bnb_proba * 0.34)
+    return return_val
 
-    return returnval
+
+def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
+    """Given a SmiteBuild, return all possible builds containing the core and the required number
+    of optional items to complete a build.
+
+    Args:
+        build (SmiteBuild): A set of core and optional items for a build.
+
+    Returns:
+        List[Set[int]]: A list of sets containing the item ids for each complete build.
+    """
+    num_optional = 6 - len(build.core)
+
+    if len(build.optional) > num_optional:
+        optionals = [
+            cast(Set[int], set(x))
+            for x in combinations(build.optional, num_optional)
+        ]
+    else:
+        optionals = [build.optional]
+    
+    return [build.core | x for x in optionals]

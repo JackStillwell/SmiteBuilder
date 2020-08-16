@@ -6,7 +6,8 @@ from smitebuilder.smitebuild import (
     rate_smitebuild,
     RawMatchData,
     ItemData,
-    SmiteBuild
+    SmiteBuild,
+    gen_all_builds
 )
 
 from smitebuilder.smiteinfo import RankTier
@@ -95,14 +96,33 @@ def test_make_smitebuilds():
 
 def test_rate_smitebuild():
     dt_mock = mock.MagicMock()
-    dt_mock.predict_proba.return_value = [[0, 1]]
+    dt_mock.predict_proba.return_value = [[0, 1], [1, 0], [0.5, 0.5]]
     bnb_mock = mock.MagicMock()
-    bnb_mock.predict_proba.return_value = [[1, 0]]
+    bnb_mock.predict_proba.return_value = [[0, 1], [0, 1], [0, 1]]
 
-    build = SmiteBuild(core={12, 78}, optional={90, 56})
-    feature_list = [12, 34, 56, 78, 90]
+    build = SmiteBuild(core=set(), optional=set())
+    feature_list = []
 
-    expected = 0.66
-    result = rate_smitebuild(build, feature_list, dt_mock, bnb_mock)
+    expected_30 = 0.65
+    expected_70 = 0.85
+    result_30 = rate_smitebuild(build, feature_list, dt_mock, bnb_mock, 0.5, 0.5, 30)
+    result_70 = rate_smitebuild(build, feature_list, dt_mock, bnb_mock, 0.5, 0.5, 70)
 
-    assert expected == result
+    assert expected_30 == result_30 and expected_70 == result_70
+
+
+def test_gen_all_builds():
+    build = SmiteBuild(core={12, 78, 90, 56}, optional={11, 22, 33, 44})
+
+    expected = [
+        {12, 78, 90, 56, 11, 22},
+        {12, 78, 90, 56, 11, 33},
+        {12, 78, 90, 56, 11, 44},
+        {12, 78, 90, 56, 22, 33},
+        {12, 78, 90, 56, 22, 44},
+        {12, 78, 90, 56, 33, 44},
+    ]
+
+    result = gen_all_builds(build)
+
+    assert len(expected) == len(result) and all([x in expected for x in result])

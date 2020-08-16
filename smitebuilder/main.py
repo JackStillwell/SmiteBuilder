@@ -122,15 +122,17 @@ def main(
             criterion="entropy", max_features=1, random_state=0,
         )
         dt_classifier.fit(item_data.item_matrix, new_winlabel)
+        dt_score = dt_classifier.score(item_data.item_matrix, new_winlabel)
 
         if not silent:
-            print("dt_score:", dt_classifier.score(item_data.item_matrix, new_winlabel))
+            print("dt_score:", dt_score)
 
         bnb_classifier = BernoulliNB()
         bnb_classifier.fit(item_data.item_matrix, new_winlabel)
+        bnb_score = bnb_classifier.score(item_data.item_matrix, new_winlabel)
 
         if not silent:
-            print("bnb_score:", bnb_classifier.score(item_data.item_matrix, new_winlabel))
+            print("bnb_score:", bnb_score)
 
         traces = []
         dt_tracer.trace_decision(dt_classifier.tree_, 0, [], traces, 5)
@@ -138,12 +140,21 @@ def main(
         # turn the traces into smitebuilds
         smitebuilds = make_smitebuilds(traces, 4, item_data.feature_list)
 
+        dt_percentage = dt_score / (dt_score + bnb_score)
+        bnb_percentage = 1.0 - dt_percentage
+
         # rate the smitebuilds
         smitebuild_confidence = [
             (
                 x,
                 rate_smitebuild(
-                    x, item_data.feature_list, dt_classifier, bnb_classifier
+                    x,
+                    item_data.feature_list,
+                    dt_classifier,
+                    bnb_classifier,
+                    dt_percentage,
+                    bnb_percentage,
+                    30 # 70% of the scores must be above this number
                 ),
             )
             for x in smitebuilds
