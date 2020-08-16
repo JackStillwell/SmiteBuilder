@@ -6,7 +6,7 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from typing import cast, Dict, List, Set
+from typing import cast, Dict, List, Set, Union
 from dataclasses import dataclass
 from itertools import combinations
 
@@ -130,12 +130,12 @@ def make_smitebuilds(
 
 
 def _convert_build_to_observation(
-    build: List[int], feature_list: List[int]
+    build: Union[List[int], Set[int]], feature_list: List[int]
 ) -> np.ndarray:
     """Converts a list of SMITE ids into the corresponding observation.
 
     Args:
-        build (List[int]): A list of SMITE item ids.
+        build (Union[List[int], Set[int]]): A list or set of SMITE item ids.
         feature_list (List[int]): A list where the index of an item_id corresponds to the feature
                                   index.
 
@@ -172,19 +172,12 @@ def rate_smitebuild(
     """
 
     builds = gen_all_builds(build)
-    observations = [_convert_build_to_observation(list(x), feature_list) for x in builds]
-
-    dt_raw_probas = dt.predict_proba(
-        np.array(observations).reshape(
-            len(observations), len(feature_list)
-        )
+    observations = np.vstack(
+        (_convert_build_to_observation(x, feature_list) for x in builds)
     )
+    dt_raw_probas = dt.predict_proba(observations)
     dt_probas = [x[1] for x in dt_raw_probas]
-    bnb_raw_probas = bnb.predict_proba(
-        np.array(observations).reshape(
-            len(observations), len(feature_list)
-        )
-    )
+    bnb_raw_probas = bnb.predict_proba(observations)
     bnb_probas = [x[1] for x in bnb_raw_probas]
 
     dt_70 = np.percentile(dt_probas, 30)
