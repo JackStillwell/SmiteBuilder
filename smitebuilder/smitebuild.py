@@ -6,7 +6,7 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from typing import cast, Dict, List, Set, Union
+from typing import cast, Dict, List, NamedTuple, Set, Union
 from dataclasses import dataclass
 from itertools import combinations
 
@@ -214,16 +214,19 @@ def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
     return [build.core | x for x in optionals]
 
 
-def consolidate_builds(builds: List[SmiteBuild]) -> SmiteBuild:
-    raw_items: List[int] = [z for y in builds for x in gen_all_builds(y) for z in x]
-    unique_items = set(raw_items)
-    item_counts: Dict[int, int] = {x: raw_items.count(x) for x in unique_items}
+class ConsolBuild(NamedTuple):
+    build: SmiteBuild
+    reviewed: bool
 
-    core_num = max(item_counts.values())
-    core = {x for x in item_counts.keys() if item_counts[x] == core_num}
-    optional = unique_items - core
 
-    return SmiteBuild(
-        core=core,
-        optional=optional,
-    )
+def consolidate_builds(builds: List[SmiteBuild]) -> List[SmiteBuild]:
+    """NEEDS DOCSTRING
+    """
+    consolbuilds = [ConsolBuild(build=x, reviewed=False) for x in builds]
+
+    reviewed_build = consolbuilds[0]
+    while not all([x.reviewed for x in consolbuilds]):
+        # NOTE: don't forget to set all "reviewed" to false any time a build changes
+        pass
+
+    return []
