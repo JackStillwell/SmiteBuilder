@@ -143,9 +143,15 @@ smitebuild_data = [
 @pytest.mark.parametrize(
     "builds,expected",
     [
-        (smitebuild_data[0:3], None),
-        (smitebuild_data[1:4], None),
-        (smitebuild_data[:3] + [smitebuild_data[-1]], None),
+        (smitebuild_data[0:3], [SmiteBuild(core={1,2,3,4,5,6,7}, optional={8,9})]),
+        (smitebuild_data[1:4], [
+            SmiteBuild(core={11, 12, 13, 14}, optional={15, 16}),
+            SmiteBuild(core={1,2,3,5,7}, optional={4,6,8,9}),
+        ]),
+        (smitebuild_data[:3] + [smitebuild_data[-1]], [
+            SmiteBuild(core={11, 12, 13, 14}, optional={15, 16}),
+            SmiteBuild(core={1,2,3,4,5,6,7}, optional={8,9})
+        ]),
     ],
 )
 def test_consolidate_builds(builds, expected):

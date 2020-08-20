@@ -231,13 +231,14 @@ def consolidate(builds: Tuple[SmiteBuild, SmiteBuild]) -> Optional[SmiteBuild]:
 def consolidate_builds(builds: List[SmiteBuild]):
     """NEEDS DOCSTRING NOTE: Works in-place.
     """
-    possible_consolidations = combinations(builds, 2)
+    possible_consolidations = list(combinations(builds, 2))
 
-    for c in possible_consolidations:
+    while possible_consolidations:
+        c = possible_consolidations.pop()
         consolidation = consolidate(c)
 
         if consolidation:
             builds.remove(c[0])
             builds.remove(c[1])
             builds.append(consolidation)
-            possible_consolidations = combinations(builds, 2)
+            possible_consolidations = list(combinations(builds, 2))
