@@ -8,7 +8,7 @@ match data by player skill level and converting model output into readable SMITE
 
 from typing import cast, Dict, List, NamedTuple, Optional, Set, Tuple, Union
 from dataclasses import dataclass
-from itertools import combinations, product
+from itertools import combinations
 
 import numpy as np
 
@@ -216,7 +216,7 @@ def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
     return [build.core | x for x in optionals]
 
 
-def consolidate(builds: Tuple[SmiteBuild]) -> Optional[SmiteBuild]:
+def consolidate(builds: Tuple[SmiteBuild, SmiteBuild]) -> Optional[SmiteBuild]:
     """NEEDS DOCSTRING
     """
     all_builds = [list(x.core) + list(x.optional) for x in builds]
@@ -231,7 +231,7 @@ def consolidate(builds: Tuple[SmiteBuild]) -> Optional[SmiteBuild]:
 def consolidate_builds(builds: List[SmiteBuild]):
     """NEEDS DOCSTRING NOTE: Works in-place.
     """
-    possible_consolidations = product(builds)
+    possible_consolidations = combinations(builds, 2)
 
     for c in possible_consolidations:
         consolidation = consolidate(c)
@@ -240,4 +240,4 @@ def consolidate_builds(builds: List[SmiteBuild]):
             builds.remove(c[0])
             builds.remove(c[1])
             builds.append(consolidation)
-            possible_consolidations = product(builds)
+            possible_consolidations = combinations(builds, 2)
