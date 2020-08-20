@@ -11,7 +11,7 @@ from smitebuilder.etl import (
     store_build,
     load_build,
 )
-from smitebuilder.main import MainReturn, ReadableSmiteBuild 
+from smitebuilder.main import MainReturn, ReadableSmiteBuild
 
 
 def test_get_godmap():
@@ -42,9 +42,9 @@ def test_get_matchdata():
     """Checking that fields are imported correctly and only the relevant information is included"""
     expected = [
         {"joust_tier": 1, "match_time_minutes": 10},
-        {"deaths": 2, "damage_player": 16, "match_time_minutes": 10}
+        {"deaths": 2, "damage_player": 16, "match_time_minutes": 10},
     ]
-    
+
     actual = get_matchdata("tests/test_matchdata.json")
 
     assert expected == actual
@@ -118,8 +118,7 @@ def test_extract_item_data():
 def test_store_load_build():
     build_to_store = MainReturn(
         build=ReadableSmiteBuild(
-            core=["item_one", "item_two"],
-            optional=["item_three"]
+            core=["item_one", "item_two"], optional=["item_three"]
         ),
         confidence=90.0,
     )

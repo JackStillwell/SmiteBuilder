@@ -8,7 +8,8 @@ from smitebuilder.smitebuild import (
     ItemData,
     SmiteBuild,
     gen_all_builds,
-    consolidate_builds
+    consolidate_builds,
+    consolidate,
 )
 
 from smitebuilder.smiteinfo import RankTier
@@ -66,12 +67,12 @@ def test_fuse_evolution_items():
 
 
 @pytest.mark.parametrize(
-    "expected,frequency_cutoff", 
+    "expected,frequency_cutoff",
     [
         ([True, True, True], 0.25),
         ([False, True, True], 0.5),
-        ([False, False, True], 0.75)
-    ]
+        ([False, False, True], 0.75),
+    ],
 )
 def test_prune_item_data(expected, frequency_cutoff):
     item_matrix = np.array([[0, 0, 1], [0, 1, 1], [1, 1, 1],])
@@ -83,13 +84,12 @@ def test_prune_item_data(expected, frequency_cutoff):
 
 def test_make_smitebuilds():
     traces = [
-        [0, 3, 4],
-        [0, 3, 2],
-        [0, 1, 4],
+        [12, 78, 90],
+        [12, 78, 56],
+        [12, 34, 90],
     ]
-    feature_list = [12, 34, 56, 78, 90]
 
-    result = make_smitebuilds(traces, 2, feature_list)
+    result = make_smitebuilds(traces, 2)
     expected = [
         SmiteBuild(core={12, 78}, optional={90, 56}),
         SmiteBuild(core={12, 90}, optional={34, 78}),
@@ -97,13 +97,8 @@ def test_make_smitebuilds():
 
     assert expected == result
 
-@pytest.mark.parametrize(
-    "expected,percentile_cutoff", 
-    [
-        (0.65, 30),
-        (0.85, 70),
-    ]
-)
+
+@pytest.mark.parametrize("expected,percentile_cutoff", [(0.65, 30), (0.85, 70),])
 def test_rate_smitebuild(expected, percentile_cutoff):
     dt_mock = mock.MagicMock()
     dt_mock.predict_proba.return_value = [[0, 1], [1, 0], [0.5, 0.5]]
@@ -113,7 +108,9 @@ def test_rate_smitebuild(expected, percentile_cutoff):
     build = SmiteBuild(core=set(), optional=set())
     feature_list = []
 
-    result = rate_smitebuild(build, feature_list, dt_mock, bnb_mock, 0.5, 0.5, percentile_cutoff)
+    result = rate_smitebuild(
+        build, feature_list, dt_mock, bnb_mock, 0.5, 0.5, percentile_cutoff
+    )
 
     assert expected == result
 
@@ -135,27 +132,46 @@ def test_gen_all_builds():
     assert len(expected) == len(result) and all([x in expected for x in result])
 
 
-def test_consolidate_builds():
-    builds = [
-        SmiteBuild(
-            core={1, 2, 3, 4},
-            optional={5, 6, 7}
-        ),
-        SmiteBuild(
-            core={1, 2, 3, 5},
-            optional={7, 8, 9},
-        ),
-        SmiteBuild(
-            core={7, 6, 5, 4},
-            optional={3, 2, 1},
-        )
-    ]
+smitebuild_data = [
+    SmiteBuild(core={1, 2, 3, 4}, optional={5, 6, 7}),
+    SmiteBuild(core={1, 2, 3, 5}, optional={7, 8, 9},),
+    SmiteBuild(core={7, 6, 5, 4}, optional={3, 2, 1},),
+    SmiteBuild(core={11, 12, 13, 14}, optional={15, 16},),
+]
 
-    expected = SmiteBuild(
-        core={1, 2, 3, 5},
-        optional={4, 6, 7, 8, 9}
-    )
 
-    result = consolidate_builds(builds)
+@pytest.mark.parametrize(
+    "builds,expected",
+    [
+        (smitebuild_data[:2], [smitebuild_data[0], smitebuild_data[1]],),
+        (
+            smitebuild_data[1:3],
+            SmiteBuild(core={1, 2, 3, 4, 5, 6, 7}, optional=set(),),
+        ),
+        (smitebuild_data[:1] + [smitebuild_data[-1]], None),
+    ],
+)
+def test_consolidate_builds(builds, expected):
+    consolidate_builds(builds)
+
+    assert builds == expected
+
+
+@pytest.mark.parametrize(
+    "builds,expected",
+    [
+        (
+            (smitebuild_data[0], smitebuild_data[1]),
+            SmiteBuild(core={1, 2, 3, 5, 7}, optional={4, 6, 8, 9},),
+        ),
+        (
+            (smitebuild_data[0], smitebuild_data[2]),
+            SmiteBuild(core={1, 2, 3, 4, 5, 6, 7}, optional=set(),),
+        ),
+        ((smitebuild_data[0], smitebuild_data[3]), None),
+    ],
+)
+def test_consolidate(builds, expected):
+    result = consolidate(builds)
 
     assert result == expected

@@ -89,8 +89,10 @@ def get_matchdata(path: str) -> List[RawMatchData]:
         "item_ids",
         "match_time_minutes",
     ]
-    
-    raw_data = [{k: v for k, v in x.items() if k in relevant_information} for x in raw_data]
+
+    raw_data = [
+        {k: v for k, v in x.items() if k in relevant_information} for x in raw_data
+    ]
     raw_data = [x for x in raw_data if x["match_time_minutes"] > 0]
 
     return raw_data
@@ -196,10 +198,9 @@ def load_build(path: str) -> List[MainReturn]:
     with open(path, "r") as infile:
         raw_list = json.loads("".join(infile.readlines()))
 
-    return [MainReturn(
-        build=ReadableSmiteBuild(
-            core=x[0][0],
-            optional=x[0][1],
-        ),
-        confidence=x[1],
-    ) for x in raw_list]
+    return [
+        MainReturn(
+            build=ReadableSmiteBuild(core=x[0][0], optional=x[0][1],), confidence=x[1],
+        )
+        for x in raw_list
+    ]

@@ -21,11 +21,13 @@ from sklearn.naive_bayes import BernoulliNB
 from smitebuilder import etl, smiteinfo, dt_tracer
 
 from smitebuilder.smitebuild import (
-    consolidate_builds, rate_smitebuild,
+    consolidate_builds,
+    feature_to_item,
+    rate_smitebuild,
     make_smitebuilds,
     fuse_evolution_items,
     prune_item_data,
-    filter_data_by_player_skill
+    filter_data_by_player_skill,
 )
 from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuild
 
@@ -40,8 +42,7 @@ def parse_args(args: List[str]) -> Namespace:
     parser.add_argument("--god", "-g", required=True, type=str)
     parser.add_argument("--conquest_tier", "-ct", default=15, type=int)
     parser.add_argument(
-        "--store_build", "-s", default=False,
-        choices=[True, False], type=bool
+        "--store_build", "-s", default=False, choices=[True, False], type=bool
     )
     parser.add_argument("--silent", default=False, choices=[True, False], type=bool)
 
@@ -68,9 +69,7 @@ def main(
 
     # test if build exists or needs to be generated
     if store_build:
-        build_path = os.path.join(
-            path_to_data, queue + "_builds", target_god + ".json"
-        )
+        build_path = os.path.join(path_to_data, queue + "_builds", target_god + ".json")
         if os.path.isfile(build_path):
             build_time = os.path.getmtime(build_path)
             data_time = os.path.getmtime(match_data_path)
@@ -81,7 +80,6 @@ def main(
                 if not silent:
                     print(build)
                 return build
-
 
     raw_match_data = etl.get_matchdata(match_data_path)
     returnval = []
@@ -137,8 +135,10 @@ def main(
         traces = []
         dt_tracer.trace_decision(dt_classifier.tree_, 0, [], traces, 5)
 
+        item_ids = feature_to_item(traces, item_data.feature_list)
+
         # turn the traces into smitebuilds
-        smitebuilds = make_smitebuilds(traces, 4, item_data.feature_list)
+        smitebuilds = make_smitebuilds(item_ids, 4)
 
         dt_percentage = dt_score / (dt_score + bnb_score)
         bnb_percentage = 1.0 - dt_percentage
@@ -154,7 +154,7 @@ def main(
                     bnb_classifier,
                     dt_percentage,
                     bnb_percentage,
-                    30 # 70% of the scores must be above this number
+                    30,  # 70% of the scores must be above this number
                 ),
             )
             for x in smitebuilds
@@ -162,7 +162,9 @@ def main(
 
         smitebuild_confidence.sort(key=lambda x: x[1], reverse=True)
 
-        final_build = consolidate_builds([x[0] for x in smitebuild_confidence[:3]])
+        final_build = [x[0] for x in smitebuild_confidence[:3]]
+
+        consolidate_builds(final_build)
         final_confidence = rate_smitebuild(
             final_build,
             item_data.feature_list,
@@ -170,7 +172,7 @@ def main(
             bnb_classifier,
             dt_percentage,
             bnb_percentage,
-            30 
+            30,
         )
 
         elem = MainReturn(
@@ -189,8 +191,8 @@ def main(
 
         if store_build:
             etl.store_build(
-                returnval, 
-                os.path.join(path_to_data, queue + "_builds", target_god + ".json")
+                returnval,
+                os.path.join(path_to_data, queue + "_builds", target_god + ".json"),
             )
 
         return returnval
@@ -204,5 +206,5 @@ if __name__ == "__main__":
         args.god,
         args.conquest_tier,
         args.store_build,
-        args.silent
+        args.silent,
     )

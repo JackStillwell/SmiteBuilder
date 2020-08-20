@@ -6,9 +6,9 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from typing import cast, Dict, List, NamedTuple, Set, Union
+from typing import cast, Dict, List, NamedTuple, Optional, Set, Tuple, Union
 from dataclasses import dataclass
-from itertools import combinations
+from itertools import combinations, product
 
 import numpy as np
 
@@ -92,24 +92,27 @@ def prune_item_data(item_matrix: np.ndarray, frequency_cutoff=0.03) -> List[bool
     return [True if x in tokeep else False for x in range(item_matrix.shape[1])]
 
 
-def make_smitebuilds(
-    traces: List[List[int]], num_core: int, feature_list: List[int]
-) -> List[SmiteBuild]:
+def feature_to_item(
+    feature_ids: List[List[int]], feature_map: List[int]
+) -> List[List[int]]:
+    """Needs Docstring
+    """
+    return [[feature_map[x] for x in ids] for ids in feature_ids]
+
+
+def make_smitebuilds(raw_builds: List[List[int]], num_core: int,) -> List[SmiteBuild]:
     """Transform decision tree traces into SMITE item builds.
 
     Args:
-        traces (List[List[int]]): A list of all the traces of the decision tree.
+        raw_builds (List[List[int]]): A list of item_ids from the traces of the decision tree.
         num_core (int): The minimum number of items similar between multiple builds to be
                         considered a "core".
-        feature_list (List[int]): A list mapping feature id (col idx) to item id.
 
     Returns:
         List[SmiteBuild]: A list of builds with "core" and "optional" items.
     """
 
     # first, convert all feature ids to item ids
-    raw_builds = [[feature_list[x] for x in trace] for trace in traces]
-
     smitebuilds = []
 
     for i, build_i in enumerate(raw_builds):
@@ -205,28 +208,36 @@ def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
 
     if len(build.optional) > num_optional:
         optionals = [
-            cast(Set[int], set(x))
-            for x in combinations(build.optional, num_optional)
+            cast(Set[int], set(x)) for x in combinations(build.optional, num_optional)
         ]
     else:
         optionals = [build.optional]
-    
+
     return [build.core | x for x in optionals]
 
 
-class ConsolBuild(NamedTuple):
-    build: SmiteBuild
-    reviewed: bool
-
-
-def consolidate_builds(builds: List[SmiteBuild]) -> List[SmiteBuild]:
+def consolidate(builds: Tuple[SmiteBuild]) -> Optional[SmiteBuild]:
     """NEEDS DOCSTRING
     """
-    consolbuilds = [ConsolBuild(build=x, reviewed=False) for x in builds]
+    all_builds = [list(x.core) + list(x.optional) for x in builds]
+    new_builds = make_smitebuilds(all_builds, 4)
 
-    reviewed_build = consolbuilds[0]
-    while not all([x.reviewed for x in consolbuilds]):
-        # NOTE: don't forget to set all "reviewed" to false any time a build changes
-        pass
+    if len(new_builds) > 1 or not new_builds:
+        return None
 
-    return []
+    return new_builds[0]
+
+
+def consolidate_builds(builds: List[SmiteBuild]):
+    """NEEDS DOCSTRING NOTE: Works in-place.
+    """
+    possible_consolidations = product(builds)
+
+    for c in possible_consolidations:
+        consolidation = consolidate(c)
+
+        if consolidation:
+            builds.remove(c[0])
+            builds.remove(c[1])
+            builds.append(consolidation)
+            possible_consolidations = product(builds)
