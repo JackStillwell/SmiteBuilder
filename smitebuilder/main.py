@@ -165,29 +165,31 @@ def main(
         final_build = [x[0] for x in smitebuild_confidence[:3]]
 
         consolidate_builds(final_build)
-        final_confidence = rate_smitebuild(
-            final_build,
-            item_data.feature_list,
-            dt_classifier,
-            bnb_classifier,
-            dt_percentage,
-            bnb_percentage,
-            30,
-        )
 
-        elem = MainReturn(
-            build=ReadableSmiteBuild(
-                core=[item_map[x] for x in final_build.core],
-                optional=[item_map[x] for x in final_build.optional],
-            ),
-            confidence=final_confidence,
-        )
-        returnval.append(elem)
+        for build in final_build:
+            confidence = rate_smitebuild(
+                build,
+                item_data.feature_list,
+                dt_classifier,
+                bnb_classifier,
+                dt_percentage,
+                bnb_percentage,
+                30,
+            )
 
-        if not silent:
-            print("core:", [item_map[x] for x in final_build.core])
-            print("optional:", [item_map[x] for x in final_build.optional])
-            print("confidence:", final_confidence)
+            elem = MainReturn(
+                build=ReadableSmiteBuild(
+                    core=[item_map[x] for x in build.core],
+                    optional=[item_map[x] for x in build.optional],
+                ),
+                confidence=confidence,
+            )
+            returnval.append(elem)
+
+            if not silent:
+                print("core:", elem.build.core)
+                print("optional:", elem.build.optional)
+                print("confidence:", confidence)
 
         if store_build:
             etl.store_build(
