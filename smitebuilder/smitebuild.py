@@ -6,7 +6,7 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from typing import cast, Dict, List, NamedTuple, Optional, Set, Tuple, Union
+from typing import Callable, cast, Dict, List, NamedTuple, Optional, Set, Tuple, Union
 from dataclasses import dataclass
 from itertools import combinations
 
@@ -112,7 +112,6 @@ def make_smitebuilds(raw_builds: List[List[int]], num_core: int,) -> List[SmiteB
         List[SmiteBuild]: A list of builds with "core" and "optional" items.
     """
 
-    # first, convert all feature ids to item ids
     smitebuilds = []
 
     for i, build_i in enumerate(raw_builds):
@@ -151,6 +150,31 @@ def _convert_build_to_observation(
     )
 
 
+def rate_builds(
+    builds: List[Set[int]],
+    feature_list: List[int],
+    dt,
+    bnb,
+    dt_percentage: float,
+    bnb_percentage: float,
+) -> List[float]:
+    """NEEDS DOCSTRING
+    """
+    observations = np.vstack(
+        [_convert_build_to_observation(x, feature_list) for x in builds]
+    )
+    dt_raw_probas = dt.predict_proba(observations)
+    dt_probas = [x[1] for x in dt_raw_probas]
+    bnb_raw_probas = bnb.predict_proba(observations)
+    bnb_probas = [x[1] for x in bnb_raw_probas]
+
+    return [
+        (x * dt_percentage) + (y * bnb_percentage)
+        for x, y in zip(dt_probas, bnb_probas)
+    ]
+
+
+
 def rate_smitebuild(
     build: SmiteBuild,
     feature_list: List[int],
@@ -178,20 +202,9 @@ def rate_smitebuild(
     """
 
     builds = gen_all_builds(build)
-    observations = np.vstack(
-        [_convert_build_to_observation(x, feature_list) for x in builds]
-    )
-    dt_raw_probas = dt.predict_proba(observations)
-    dt_probas = [x[1] for x in dt_raw_probas]
-    bnb_raw_probas = bnb.predict_proba(observations)
-    bnb_probas = [x[1] for x in bnb_raw_probas]
+    ratings = rate_builds(builds, feature_list, dt, bnb, dt_percentage, bnb_percentage)
 
-    dt_70 = np.percentile(dt_probas, percentile_cutoff)
-    bnb_70 = np.percentile(bnb_probas, percentile_cutoff)
-
-    return_val = (dt_70 * dt_percentage) + (bnb_70 * bnb_percentage)
-
-    return return_val
+    return np.percentile(ratings, percentile_cutoff)
 
 
 def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
@@ -242,3 +255,27 @@ def consolidate_builds(builds: List[SmiteBuild]):
             builds.remove(c[1])
             builds.append(consolidation)
             possible_consolidations = list(combinations(builds, 2))
+
+
+def prune_and_split_builds(
+    builds: List[SmiteBuild],
+    rate_builds: Callable[
+        [List[Set[int]]],
+        List[float]
+    ],
+    rating_cutoff: float,
+) -> List[SmiteBuild]:
+    """NEEDS DOCSTRING
+    """
+
+    # First, make all possible builds
+    all_builds = [y for build in builds for y in gen_all_builds(build)]
+
+    # then rate all the builds
+    build_ratings = rate_builds(all_builds)
+
+    pruned_builds = [list(x) for x, y in zip (all_builds, build_ratings) if y > rating_cutoff]
+
+    return make_smitebuilds(pruned_builds, 4)
+
+
