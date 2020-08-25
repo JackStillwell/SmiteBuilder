@@ -174,7 +174,6 @@ def rate_builds(
     ]
 
 
-
 def rate_smitebuild(
     build: SmiteBuild,
     feature_list: List[int],
@@ -259,10 +258,7 @@ def consolidate_builds(builds: List[SmiteBuild]):
 
 def prune_and_split_builds(
     builds: List[SmiteBuild],
-    rate_builds: Callable[
-        [List[Set[int]]],
-        List[float]
-    ],
+    rate_builds: Callable[[List[Set[int]]], List[float]],
     rating_cutoff: float,
 ) -> List[SmiteBuild]:
     """NEEDS DOCSTRING
@@ -274,8 +270,9 @@ def prune_and_split_builds(
     # then rate all the builds
     build_ratings = rate_builds(all_builds)
 
-    pruned_builds = [list(x) for x, y in zip (all_builds, build_ratings) if y > rating_cutoff]
+    pruned_builds = [
+        list(x) for x, y in zip(all_builds, build_ratings) if y > rating_cutoff
+    ]
 
     return make_smitebuilds(pruned_builds, 4)
-
 
