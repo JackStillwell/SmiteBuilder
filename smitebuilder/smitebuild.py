@@ -6,20 +6,19 @@ The SmiteBuild module performs all data manipulation unique to SMITE data. This 
 match data by player skill level and converting model output into readable SMITE builds.
 """
 
-from typing import Callable, cast, Dict, List, NamedTuple, Optional, Set, Tuple, Union
+from typing import Callable, cast, Dict, List, Optional, Set, FrozenSet, Tuple, Union
 from dataclasses import dataclass
 from itertools import combinations
 
 import numpy as np
 
 from smitebuilder.etl import RawMatchData, ItemData
-from smitebuilder.smiteinfo import RankTier
+from smitebuilder.smiteinfo import RankTier, SmiteBuild
 
 
-@dataclass
-class SmiteBuild:
-    core: Set[int]
-    optional: Set[int]
+NUM_ITEMS_IN_BUILD = 6
+NUM_ITEMS_IN_CORE = 4
+BUILD_SIMILARITY_CUTOFF = 0.25
 
 
 def filter_data_by_player_skill(
@@ -151,7 +150,7 @@ def _convert_build_to_observation(
 
 
 def rate_builds(
-    builds: List[Set[int]],
+    builds: List[FrozenSet[int]],
     feature_list: List[int],
     dt,
     bnb,
@@ -206,7 +205,7 @@ def rate_smitebuild(
     return np.percentile(ratings, percentile_cutoff)
 
 
-def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
+def gen_all_builds(build: SmiteBuild) -> List[FrozenSet[int]]:
     """Given a SmiteBuild, return all possible builds containing the core and the required number
     of optional items to complete a build.
 
@@ -216,7 +215,7 @@ def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
     Returns:
         List[Set[int]]: A list of sets containing the item ids for each complete build.
     """
-    num_optional = 6 - len(build.core)
+    num_optional = max(0, NUM_ITEMS_IN_BUILD - len(build.core))
 
     if len(build.optional) > num_optional:
         optionals = [
@@ -225,14 +224,14 @@ def gen_all_builds(build: SmiteBuild) -> List[Set[int]]:
     else:
         optionals = [build.optional]
 
-    return [build.core | x for x in optionals]
+    return [frozenset(build.core | x) for x in optionals]
 
 
 def consolidate(builds: Tuple[SmiteBuild, SmiteBuild]) -> Optional[SmiteBuild]:
     """NEEDS DOCSTRING
     """
     all_builds = [list(x.core) + list(x.optional) for x in builds]
-    new_builds = make_smitebuilds(all_builds, 4)
+    new_builds = make_smitebuilds(all_builds, NUM_ITEMS_IN_CORE)
 
     if len(new_builds) > 1 or not new_builds:
         return None
@@ -256,16 +255,16 @@ def consolidate_builds(builds: List[SmiteBuild]):
             possible_consolidations = list(combinations(builds, 2))
 
 
-def prune_and_split_builds(
-    builds: List[SmiteBuild],
-    rate_builds: Callable[[List[Set[int]]], List[float]],
+def prune_and_split_build(
+    build: SmiteBuild,
+    rate_builds: Callable[[List[FrozenSet[int]]], List[float]],
     rating_cutoff: float,
 ) -> List[SmiteBuild]:
     """NEEDS DOCSTRING
     """
 
     # First, make all possible builds
-    all_builds = [y for build in builds for y in gen_all_builds(build)]
+    all_builds = gen_all_builds(build)
 
     # then rate all the builds
     build_ratings = rate_builds(all_builds)
@@ -274,5 +273,59 @@ def prune_and_split_builds(
         list(x) for x, y in zip(all_builds, build_ratings) if y > rating_cutoff
     ]
 
-    return make_smitebuilds(pruned_builds, 4)
+    smitebuilds = make_smitebuilds(pruned_builds, 4)
+
+    return smitebuilds
+
+
+def select_builds(builds: List[SmiteBuild], num_select: int) -> List[SmiteBuild]:
+    """Given a list of builds and number of builds to select, return a list of distinct
+    (containing no more than 4 similar items) SmiteBuilds.
+
+    Args:
+        builds (List[SmiteBuild]): [description]
+        num_select (int): [description]
+
+    Returns:
+        List[SmiteBuild]: [description]
+    """
+
+    ret_list = []
+    i = 0
+    while len(ret_list) < num_select and i < len(builds):
+        curr_build = builds[i]
+        add = True
+        for build in ret_list:
+            if build_similarity(build, curr_build) > BUILD_SIMILARITY_CUTOFF:
+                add = False
+
+        if add:
+            ret_list.append(curr_build)
+
+        i += 1
+
+    return ret_list
+
+
+def build_similarity(build1: SmiteBuild, build2: SmiteBuild) -> float:
+    """Given two SmiteBuild objects, return the percentage of possible builds which are identical
+    between the two.
+
+    Args:
+        build1 (SmiteBuild): [description]
+        build2 (SmiteBuild): [description]
+
+    Returns:
+        float: [description]
+    """
+
+    all_ones = set(gen_all_builds(build1))
+    all_twos = set(gen_all_builds(build2))
+
+    all_possible = all_ones | all_twos
+    all_similar = all_ones & all_twos
+
+    similarity = len(all_similar) / len(all_possible)
+
+    return similarity
 
