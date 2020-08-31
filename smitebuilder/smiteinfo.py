@@ -7,7 +7,7 @@ and the data returned by the SMITE API and understood by the models.
 """
 
 from enum import IntEnum
-from typing import Dict, List, NamedTuple, Set
+from typing import Dict, List, NamedTuple, Set, FrozenSet
 
 from dataclasses import dataclass
 
@@ -16,6 +16,24 @@ from dataclasses import dataclass
 class SmiteBuild:
     core: Set[int]
     optional: Set[int]
+
+
+@dataclass
+class SmiteBuildPath:
+    core: FrozenSet[int]
+    optionals: Set[FrozenSet[int]]
+
+
+class ReadableSmiteBuildPath(NamedTuple):
+    core: List[str]
+    optionals: List[List[str]]
+
+    @staticmethod
+    def from_SmiteBuildPath(build: SmiteBuildPath, item_map: Dict[int, str]):
+        return ReadableSmiteBuildPath(
+            core=[item_map[x] for x in build.core],
+            optionals=[[item_map[x] for x in y] for y in build.optionals],
+        )
 
 
 class ReadableSmiteBuild(NamedTuple):

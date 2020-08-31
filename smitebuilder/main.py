@@ -31,8 +31,15 @@ from smitebuilder.smitebuild import (
     prune_item_data,
     filter_data_by_player_skill,
     select_builds,
+    find_common_cores,
+    get_options,
 )
-from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuild
+from smitebuilder.smiteinfo import (
+    MainReturn,
+    ReadableSmiteBuild,
+    SmiteBuildPath,
+    ReadableSmiteBuildPath,
+)
 
 
 def parse_args(args: List[str]) -> Namespace:
@@ -160,6 +167,19 @@ def main(
         smitebuild_confidence = [(x, rate_smitebuild_lambda(x)) for x in smitebuilds]
 
         smitebuild_confidence.sort(key=lambda x: x[1], reverse=True)
+
+        greater_than_75 = [x[0] for x in smitebuild_confidence if x[1] > 0.75]
+
+        common_cores = find_common_cores(greater_than_75, 4, 5)
+
+        build_paths = [
+            SmiteBuildPath(core=x, optionals=get_options(greater_than_75, x))
+            for x in common_cores
+        ]
+
+        readable_paths = [
+            ReadableSmiteBuildPath.from_SmiteBuildPath(x, item_map) for x in build_paths
+        ]
 
         final_builds = select_builds([x[0] for x in smitebuild_confidence], 3)
 

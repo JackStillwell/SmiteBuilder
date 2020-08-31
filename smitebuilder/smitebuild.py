@@ -329,3 +329,44 @@ def build_similarity(build1: SmiteBuild, build2: SmiteBuild) -> float:
 
     return similarity
 
+
+def find_common_cores(
+    builds: List[SmiteBuild], core_length: int, num_cores: int
+) -> List[FrozenSet[int]]:
+    """ Detects and returns up to "num cores" most frequently occurring cores in "builds".
+
+    Args:
+        builds (List[SmiteBuild]): [description]
+        core_length (int): [description]
+        num_cores (int): [description]
+
+    Returns:
+        List[Set[int]]: [description]
+    """
+
+    all_builds = [y for x in builds for y in gen_all_builds(x)]
+    all_cores = {frozenset(y) for x in all_builds for y in combinations(x, core_length)}
+
+    core_count = [
+        (core, sum(1 if core <= set(x) else 0 for x in all_builds))
+        for core in all_cores
+    ]
+
+    core_count.sort(key=lambda x: x[1], reverse=True)
+
+    return [x[0] for x in core_count[:num_cores]]
+
+
+def get_options(builds: List[SmiteBuild], core: FrozenSet[int]) -> Set[FrozenSet[int]]:
+    """[summary]
+
+    Args:
+        builds (List[SmiteBuild]): [description]
+        core (FrozenSet[int]): [description]
+
+    Returns:
+        List[int]: [description]
+    """
+    all_builds = [set(y) for x in builds for y in gen_all_builds(x)]
+
+    return {frozenset(x - core) for x in all_builds if core <= x}
