@@ -52,7 +52,7 @@ def get_itemmap(path: str) -> Dict[int, str]:
         if item["ItemTier"] == 4 and not item["DeviceName"].startswith("Evolved"):
             item["DeviceName"] = "Evolved " + item["DeviceName"]
 
-    return bidict({x["ItemId"]: x["DeviceName"] for x in items})
+    return bidict({x["ItemId"]: x["DeviceName"] for x in items if x["ItemTier"] >= 3})
 
 
 def get_matchdata(path: str) -> List[RawMatchData]:
