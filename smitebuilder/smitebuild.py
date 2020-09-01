@@ -331,12 +331,12 @@ def build_similarity(build1: SmiteBuild, build2: SmiteBuild) -> float:
 
 
 def find_common_cores(
-    builds: List[SmiteBuild], core_length: int, num_cores: int
+    traces: List[List[int]], core_length: int, num_cores: int
 ) -> List[FrozenSet[int]]:
-    """ Detects and returns up to "num cores" most frequently occurring cores in "builds".
+    """ Detects and returns up to "num cores" most frequently occurring cores in "traces".
 
     Args:
-        builds (List[SmiteBuild]): [description]
+        builds (List[List[int]]): [description]
         core_length (int): [description]
         num_cores (int): [description]
 
@@ -344,12 +344,12 @@ def find_common_cores(
         List[Set[int]]: [description]
     """
 
-    all_builds = [y for x in builds for y in gen_all_builds(x)]
-    all_cores = {frozenset(y) for x in all_builds for y in combinations(x, core_length)}
+    all_cores: Set[FrozenSet[int]] = {
+        frozenset(y) for x in traces for y in combinations(x, core_length)
+    }
 
     core_count = [
-        (core, sum(1 if core <= set(x) else 0 for x in all_builds))
-        for core in all_cores
+        (core, sum(1 if core <= set(x) else 0 for x in traces)) for core in all_cores
     ]
 
     core_count.sort(key=lambda x: x[1], reverse=True)
@@ -357,16 +357,86 @@ def find_common_cores(
     return [x[0] for x in core_count[:num_cores]]
 
 
-def get_options(builds: List[SmiteBuild], core: FrozenSet[int]) -> Set[FrozenSet[int]]:
+def get_options(traces: List[List[int]], core: FrozenSet[int]) -> Set[FrozenSet[int]]:
     """[summary]
 
     Args:
-        builds (List[SmiteBuild]): [description]
+        builds (List[List[int]]): [description]
         core (FrozenSet[int]): [description]
 
     Returns:
         List[int]: [description]
     """
-    all_builds = [set(y) for x in builds for y in gen_all_builds(x)]
+    return {frozenset(set(x) - core) for x in traces if core <= set(x)}
 
-    return {frozenset(x - core) for x in all_builds if core <= x}
+
+def prune_options(
+    core: FrozenSet[int],
+    optionals: Set[FrozenSet[int]],
+    rank_builds: Callable[[List[FrozenSet[int]]], List[float]],
+) -> Set[FrozenSet[int]]:
+    """Remove any options which lower the score of the build.
+
+    Args:
+        core (FrozenSet[int]): [description]
+        optionals (Set[FrozenSet[int]]): [description]
+
+    Returns:
+        Set[FrozenSet[int]]: [description]
+    """
+
+    # first, remove any single-item options which lower the chance of success
+    single_option_list = [x for x in optionals if len(x) == 1]
+    single_build_list = [core]
+    single_build_list += [option | core for option in single_option_list]
+    single_ranks = rank_builds(single_build_list)
+
+    removed_singles = {
+        option
+        for option, rank in zip(single_option_list, single_ranks)
+        if rank <= single_ranks[0]
+    }
+
+    multi_option_set = {x for x in optionals if len(x) > 1}
+    removed_singles |= multi_option_set
+
+    # next, look to combine optionals
+    for optional in optionals:
+        pass
+
+    return set()
+
+
+def consolidate_options(options: Set[FrozenSet[int]]) -> Set[FrozenSet[int]]:
+    """[summary]
+
+    Args:
+        options (List[FrozenSet[int]]): [description]
+    """
+
+    # Get a list of every item which appears with each item
+    all_items = {y for x in options for y in x}
+    item_dicts = {x: {z for y in options for z in y - {x} if x in y} for x in all_items}
+    item_groups = set()
+    for key, val in item_dicts.items():
+        new_set = set()
+        new_set.add(key)
+        new_set |= val
+        new_frozen = frozenset(new_set)
+        item_groups.add(new_frozen)
+
+    # Goal: Include all items in the smallest amount of groupings
+    # Go group by group, and include the largest group which contains the item
+    pruned_groups = set()
+    included_items = set()
+    for item in all_items:
+        if item in included_items:
+            continue
+
+        groups = list({x for x in item_groups if item in x})
+        groups.sort(key=lambda x: len(x), reverse=True)
+
+        included_items |= groups[0]
+        pruned_groups.add(groups[0])
+
+    return pruned_groups

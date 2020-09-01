@@ -35,6 +35,19 @@ class ReadableSmiteBuildPath(NamedTuple):
             optionals=[[item_map[x] for x in y] for y in build.optionals],
         )
 
+    def __str__(self):
+        s = "core: \n\t"
+        s += str(self.core) + "\n\n"
+        s += "optionals: \n"
+        for o in self.optionals:
+            s += "\t" + str(o) + "\n"
+        s += "\n"
+
+        return s
+
+    def __repr__(self):
+        return str(self)
+
 
 class ReadableSmiteBuild(NamedTuple):
     core: List[str]
