@@ -82,13 +82,13 @@ def test_prune_item_data(expected, frequency_cutoff):
 
 
 @pytest.mark.parametrize("expected,percentile_cutoff", [(0.65, 30), (0.85, 70),])
-def test_rate_smitebuild(expected, percentile_cutoff):
+def test_rate_smitebuildpath(expected, percentile_cutoff):
     dt_mock = mock.MagicMock()
     dt_mock.predict_proba.return_value = [[0, 1], [1, 0], [0.5, 0.5]]
     bnb_mock = mock.MagicMock()
     bnb_mock.predict_proba.return_value = [[0, 1], [0, 1], [0, 1]]
 
-    build = SmiteBuildPath(core=frozenset(), optionals=set())
+    build = SmiteBuildPath(core=frozenset({1}), optionals={frozenset({2})})
     feature_list = []
 
     result = rate_smitebuildpath(
@@ -125,7 +125,7 @@ similarity_data = [
 
 
 @pytest.mark.parametrize(
-    "num,expected", [(4, []), (2, []), (1, []),],
+    "num,expected,similarity_cutoff", [(4, [], 0.0), (2, [], 0.0), (1, [], 0.0),],
 )
 def test_select_builds(num, expected, similarity_cutoff):
     result = select_builds(similarity_data, num, similarity_cutoff)

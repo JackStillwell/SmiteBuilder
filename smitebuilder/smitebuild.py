@@ -129,6 +129,9 @@ def rate_builds(
 ) -> List[float]:
     """NEEDS DOCSTRING
     """
+    if not builds:
+        return []
+
     observations = np.vstack(
         [_convert_build_to_observation(x, feature_list) for x in builds]
     )
@@ -171,6 +174,9 @@ def rate_smitebuildpath(
 
     builds = list(gen_all_builds(build))
     ratings = rate_builds(builds, feature_list, dt, bnb, dt_percentage, bnb_percentage)
+
+    if not ratings:
+        return 0.0
 
     return np.percentile(ratings, percentile_cutoff)
 
@@ -319,6 +325,10 @@ def prune_options(
     all_options: List[FrozenSet[int]] = [
         frozenset(x) for x in combinations(all_items, NUM_OPTIONAL_ITEMS)
     ]
+
+    if not all_options:
+        return set()
+
     all_builds: List[FrozenSet[int]] = [
         frozenset(core | options) for options in all_options
     ]
