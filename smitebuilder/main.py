@@ -20,12 +20,8 @@ from sklearn.naive_bayes import BernoulliNB
 
 from smitebuilder import etl, smiteinfo, dt_tracer
 from smitebuilder.smitebuild import (
-    consolidate_builds,
     feature_to_item,
-    prune_and_split_build,
-    rate_smitebuild,
     rate_builds,
-    make_smitebuilds,
     fuse_evolution_items,
     prune_item_data,
     filter_data_by_player_skill,
@@ -34,6 +30,7 @@ from smitebuilder.smitebuild import (
     get_options,
     consolidate_options,
     prune_options,
+    rate_smitebuildpath,
 )
 from smitebuilder.smiteinfo import (
     MainReturn,
@@ -146,36 +143,11 @@ def main(
 
     item_ids = feature_to_item(traces, item_data.feature_list)
 
-    # turn the traces into smitebuilds
-    smitebuilds = make_smitebuilds(item_ids, 4)
-
     # turn the traces into common cores
-    cores = find_common_cores(item_ids, 4, 5)
+    cores = find_common_cores(item_ids, 4, None)
 
     dt_percentage = dt_score / (dt_score + bnb_score)
     bnb_percentage = 1.0 - dt_percentage
-
-    rate_smitebuild_lambda = lambda x: rate_smitebuild(
-        x,
-        item_data.feature_list,
-        dt_classifier,
-        bnb_classifier,
-        dt_percentage,
-        bnb_percentage,
-        30,  # 70% of the scores must be above this number
-    )
-
-    # rate the smitebuilds
-    smitebuild_confidence = [(x, rate_smitebuild_lambda(x)) for x in smitebuilds]
-
-    smitebuild_confidence.sort(key=lambda x: x[1], reverse=True)
-
-    final_builds = select_builds([x[0] for x in smitebuild_confidence], 3)
-
-    consolidate_builds(final_builds)
-
-    builds_ratings = [(x, rate_smitebuild_lambda(x)) for x in final_builds]
-
     rate_builds_lambda = lambda x: rate_builds(
         x,
         item_data.feature_list,
@@ -188,53 +160,44 @@ def main(
     build_paths = [
         SmiteBuildPath(
             core=x,
-            optionals=prune_options(
-                x, (get_options(item_ids, x)), rate_builds_lambda, 0.75
+            optionals=consolidate_options(
+                prune_options(x, (get_options(item_ids, x)), rate_builds_lambda, 75)
             ),
         )
         for x in cores
     ]
 
+    rate_smitebuild_lambda = lambda x: rate_smitebuildpath(
+        x,
+        item_data.feature_list,
+        dt_classifier,
+        bnb_classifier,
+        dt_percentage,
+        bnb_percentage,
+        30,  # 70% of the scores must be above this number
+    )
+
+    # rate the smitebuilds
+    smitebuild_confidence = [(x, rate_smitebuild_lambda(x)) for x in build_paths]
+
+    smitebuild_confidence.sort(key=lambda x: x[1], reverse=True)
+
+    final_builds = select_builds([x[0] for x in smitebuild_confidence], 3, 0.25)
+
     readable_paths = [
-        ReadableSmiteBuildPath.from_SmiteBuildPath(x, item_map) for x in build_paths
+        (
+            ReadableSmiteBuildPath.from_SmiteBuildPath(x, item_map),
+            rate_smitebuild_lambda(x),
+        )
+        for x in final_builds
     ]
 
-    print(readable_paths)
-
-    # NOTE: this is a brute force solution, find a better way to do this
-    while any(x[1] < 0.75 for x in builds_ratings):
-        builds_ratings_readable = [
-            (ReadableSmiteBuild.from_SmiteBuild(b, item_map), r)
-            for b, r in builds_ratings
-        ]
-        new_br = []
-        for build, rating in builds_ratings:
-            if rating < 0.75:
-                new_builds = prune_and_split_build(build, rate_builds_lambda, 0.75)
-                new_br += [(x, rate_smitebuild_lambda(x)) for x in new_builds]
-            else:
-                new_br.append((build, rating))
-
-        new_br.sort(key=lambda x: x[1], reverse=True)
-        builds_ratings = [
-            (x, rate_smitebuild_lambda(x))
-            for x in select_builds([x[0] for x in new_br], 3)
-        ]
-
-    for build, rating in builds_ratings:
-        elem = MainReturn(
-            build=ReadableSmiteBuild(
-                core=[item_map[x] for x in build.core],
-                optional=[item_map[x] for x in build.optional],
-            ),
-            confidence=rating,
-        )
+    for build, rating in readable_paths:
+        elem = MainReturn(build=build, confidence=rating,)
         returnval.append(elem)
 
         if not silent:
-            print("core:", elem.build.core)
-            print("optional:", elem.build.optional)
-            print("confidence:", rating)
+            print(elem)
 
     if store_build:
         etl.store_build(

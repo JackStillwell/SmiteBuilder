@@ -11,7 +11,7 @@ from smitebuilder.etl import (
     store_build,
     load_build,
 )
-from smitebuilder.main import MainReturn, ReadableSmiteBuild
+from smitebuilder.main import MainReturn, ReadableSmiteBuildPath
 
 
 def test_get_godmap():
@@ -117,8 +117,8 @@ def test_extract_item_data():
 
 def test_store_load_build():
     build_to_store = MainReturn(
-        build=ReadableSmiteBuild(
-            core=["item_one", "item_two"], optional=["item_three"]
+        build=ReadableSmiteBuildPath(
+            core=["item_one", "item_two"], optionals=[["item_three"]]
         ),
         confidence=90.0,
     )

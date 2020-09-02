@@ -13,11 +13,12 @@ from itertools import combinations
 import numpy as np
 
 from smitebuilder.etl import RawMatchData, ItemData
-from smitebuilder.smiteinfo import RankTier, SmiteBuild
+from smitebuilder.smiteinfo import RankTier, SmiteBuild, SmiteBuildPath
 
 
 NUM_ITEMS_IN_BUILD = 6
 NUM_ITEMS_IN_CORE = 4
+NUM_OPTIONAL_ITEMS = NUM_ITEMS_IN_BUILD - NUM_ITEMS_IN_CORE
 BUILD_SIMILARITY_CUTOFF = 0.25
 
 
@@ -99,39 +100,8 @@ def feature_to_item(
     return [[feature_map[x] for x in ids] for ids in feature_ids]
 
 
-def make_smitebuilds(raw_builds: List[List[int]], num_core: int,) -> List[SmiteBuild]:
-    """Transform decision tree traces into SMITE item builds.
-
-    Args:
-        raw_builds (List[List[int]]): A list of item_ids from the traces of the decision tree.
-        num_core (int): The minimum number of items similar between multiple builds to be
-                        considered a "core".
-
-    Returns:
-        List[SmiteBuild]: A list of builds with "core" and "optional" items.
-    """
-
-    smitebuilds = []
-
-    for i, build_i in enumerate(raw_builds):
-        for j, build_j in enumerate(raw_builds):
-            if i == j:
-                continue
-
-            potential_core = set(build_i) & set(build_j)
-            if len(potential_core) >= num_core:
-                optional = set(build_i) ^ set(build_j)
-                try:
-                    idx = [x.core for x in smitebuilds].index(potential_core)
-                    smitebuilds[idx].optional |= optional
-                except ValueError:
-                    smitebuilds.append(SmiteBuild(potential_core, optional))
-
-    return smitebuilds
-
-
 def _convert_build_to_observation(
-    build: Union[List[int], Set[int]], feature_list: List[int]
+    build: Union[List[int], FrozenSet[int]], feature_list: List[int]
 ) -> np.ndarray:
     """Converts a list of SMITE ids into the corresponding observation.
 
@@ -173,8 +143,8 @@ def rate_builds(
     ]
 
 
-def rate_smitebuild(
-    build: SmiteBuild,
+def rate_smitebuildpath(
+    build: SmiteBuildPath,
     feature_list: List[int],
     dt,
     bnb,
@@ -199,13 +169,13 @@ def rate_smitebuild(
         float: A float between 0 and 1 representing the confidence the models show in the build.
     """
 
-    builds = gen_all_builds(build)
+    builds = list(gen_all_builds(build))
     ratings = rate_builds(builds, feature_list, dt, bnb, dt_percentage, bnb_percentage)
 
     return np.percentile(ratings, percentile_cutoff)
 
 
-def gen_all_builds(build: SmiteBuild) -> List[FrozenSet[int]]:
+def gen_all_builds(build: SmiteBuildPath) -> Set[FrozenSet[int]]:
     """Given a SmiteBuild, return all possible builds containing the core and the required number
     of optional items to complete a build.
 
@@ -215,79 +185,32 @@ def gen_all_builds(build: SmiteBuild) -> List[FrozenSet[int]]:
     Returns:
         List[Set[int]]: A list of sets containing the item ids for each complete build.
     """
-    num_optional = max(0, NUM_ITEMS_IN_BUILD - len(build.core))
+    optionals: Set[FrozenSet[int]] = set()
 
-    if len(build.optional) > num_optional:
-        optionals = [
-            cast(Set[int], set(x)) for x in combinations(build.optional, num_optional)
-        ]
-    else:
-        optionals = [build.optional]
+    for options in build.optionals:
+        if len(options) > NUM_OPTIONAL_ITEMS:
+            option_combos: Set[FrozenSet[int]] = {
+                frozenset(x) for x in combinations(options, NUM_OPTIONAL_ITEMS)
+            }
+            optionals |= option_combos
+        else:
+            optionals.add(options)
 
-    return [frozenset(build.core | x) for x in optionals]
-
-
-def consolidate(builds: Tuple[SmiteBuild, SmiteBuild]) -> Optional[SmiteBuild]:
-    """NEEDS DOCSTRING
-    """
-    all_builds = [list(x.core) + list(x.optional) for x in builds]
-    new_builds = make_smitebuilds(all_builds, NUM_ITEMS_IN_CORE)
-
-    if len(new_builds) > 1 or not new_builds:
-        return None
-
-    return new_builds[0]
+    return {frozenset(build.core | x) for x in optionals}
 
 
-def consolidate_builds(builds: List[SmiteBuild]):
-    """NEEDS DOCSTRING NOTE: Works in-place.
-    """
-    possible_consolidations = list(combinations(builds, 2))
-
-    while possible_consolidations:
-        c = possible_consolidations.pop()
-        consolidation = consolidate(c)
-
-        if consolidation:
-            builds.remove(c[0])
-            builds.remove(c[1])
-            builds.append(consolidation)
-            possible_consolidations = list(combinations(builds, 2))
-
-
-def prune_and_split_build(
-    build: SmiteBuild,
-    rate_builds: Callable[[List[FrozenSet[int]]], List[float]],
-    rating_cutoff: float,
-) -> List[SmiteBuild]:
-    """NEEDS DOCSTRING
-    """
-
-    # First, make all possible builds
-    all_builds = gen_all_builds(build)
-
-    # then rate all the builds
-    build_ratings = rate_builds(all_builds)
-
-    pruned_builds = [
-        list(x) for x, y in zip(all_builds, build_ratings) if y > rating_cutoff
-    ]
-
-    smitebuilds = make_smitebuilds(pruned_builds, 4)
-
-    return smitebuilds
-
-
-def select_builds(builds: List[SmiteBuild], num_select: int) -> List[SmiteBuild]:
+def select_builds(
+    builds: List[SmiteBuildPath], num_select: int, build_similarity_cutoff: float
+) -> List[SmiteBuildPath]:
     """Given a list of builds and number of builds to select, return a list of distinct
-    (containing no more than 4 similar items) SmiteBuilds.
+    (a build similarity lower than "build_similarity_cutoff") SmiteBuildPaths.
 
     Args:
-        builds (List[SmiteBuild]): [description]
+        builds (List[SmiteBuildPath]): [description]
         num_select (int): [description]
 
     Returns:
-        List[SmiteBuild]: [description]
+        List[SmiteBuildPath]: [description]
     """
 
     ret_list = []
@@ -296,7 +219,7 @@ def select_builds(builds: List[SmiteBuild], num_select: int) -> List[SmiteBuild]
         curr_build = builds[i]
         add = True
         for build in ret_list:
-            if build_similarity(build, curr_build) > BUILD_SIMILARITY_CUTOFF:
+            if build_similarity(build, curr_build) > build_similarity_cutoff:
                 add = False
 
         if add:
@@ -307,13 +230,13 @@ def select_builds(builds: List[SmiteBuild], num_select: int) -> List[SmiteBuild]
     return ret_list
 
 
-def build_similarity(build1: SmiteBuild, build2: SmiteBuild) -> float:
-    """Given two SmiteBuild objects, return the percentage of possible builds which are identical
-    between the two.
+def build_similarity(build1: SmiteBuildPath, build2: SmiteBuildPath) -> float:
+    """Given two SmiteBuildPath objects, return the percentage of possible builds which are
+    identical between the two.
 
     Args:
-        build1 (SmiteBuild): [description]
-        build2 (SmiteBuild): [description]
+        build1 (SmiteBuildPath): [description]
+        build2 (SmiteBuildPath): [description]
 
     Returns:
         float: [description]
@@ -331,8 +254,8 @@ def build_similarity(build1: SmiteBuild, build2: SmiteBuild) -> float:
 
 
 def find_common_cores(
-    traces: List[List[int]], core_length: int, num_cores: int
-) -> List[FrozenSet[int]]:
+    traces: List[List[int]], core_length: int, num_cores: Optional[int]
+) -> Set[FrozenSet[int]]:
     """ Detects and returns up to "num cores" most frequently occurring cores in "traces".
 
     Args:
@@ -348,13 +271,16 @@ def find_common_cores(
         frozenset(y) for x in traces for y in combinations(x, core_length)
     }
 
+    if num_cores is None:
+        return all_cores
+
     core_count = [
         (core, sum(1 if core <= set(x) else 0 for x in traces)) for core in all_cores
     ]
 
     core_count.sort(key=lambda x: x[1], reverse=True)
 
-    return [x[0] for x in core_count[:num_cores]]
+    return {x[0] for x in core_count[:num_cores]}
 
 
 def get_options(traces: List[List[int]], core: FrozenSet[int]) -> Set[FrozenSet[int]]:
@@ -374,7 +300,7 @@ def prune_options(
     core: FrozenSet[int],
     optionals: Set[FrozenSet[int]],
     rank_builds: Callable[[List[FrozenSet[int]]], List[float]],
-    rank_cutoff: float,
+    rank_percentile_cutoff: int,
 ) -> Set[FrozenSet[int]]:
     """Remove any options which lower the score of the build.
 
@@ -389,77 +315,57 @@ def prune_options(
     # ensure every item is a single option
     all_items = {y for x in optionals for y in x}
 
-    # figure out how many items are required to fill out the core, then make all possible
-    #    combinations
-    optional_item_num = NUM_ITEMS_IN_BUILD - NUM_ITEMS_IN_CORE
-
     # rank all combinations, and remove any that lower the rank of the core
     all_options: List[FrozenSet[int]] = [
-        frozenset(x) for x in combinations(all_items, optional_item_num)
+        frozenset(x) for x in combinations(all_items, NUM_OPTIONAL_ITEMS)
     ]
     all_builds: List[FrozenSet[int]] = [
         frozenset(core | options) for options in all_options
     ]
     build_ranks = rank_builds(all_builds)
+
+    # rank percentile calculation
+    rank_cutoff = np.percentile(build_ranks, rank_percentile_cutoff)
+
     pruned_options = {
         option for option, rank in zip(all_options, build_ranks) if rank > rank_cutoff
     }
-    pruned_items = {z for z in all_items if z in {y for x in pruned_options for y in x}}
 
-    # look through the combinations, and combine any which exist where all items are
-    #    combined. [[x1, x2], [x2, x3], [x1, x3]] -> [[x1, x2, x3]]
-    for i in reversed(range(optional_item_num, len(pruned_items) + 1)):
-        possible_consolidations: Set[FrozenSet[int]] = {
-            frozenset(x) for x in combinations(pruned_items, i)
-        }
-
-        for consolidation in possible_consolidations:
-            required_subcombos = {
-                frozenset(x) for x in combinations(consolidation, optional_item_num)
-            }
-            if required_subcombos <= pruned_options:
-                pruned_options.add(consolidation)
-
-    # remove any subsets
-    deduped_options = deepcopy(pruned_options)
-    for x in pruned_options:
-        for y in pruned_options:
-            if x < y:
-                deduped_options.discard(x)
-
-    return deduped_options
+    return pruned_options
 
 
 def consolidate_options(options: Set[FrozenSet[int]]) -> Set[FrozenSet[int]]:
     """[summary]
 
     Args:
-        options (List[FrozenSet[int]]): [description]
+        options (Set[FrozenSet[int]]): [description]
+
+    Returns:
+        Set[FrozenSet[int]]: [description]
     """
 
-    # Get a list of every item which appears with each item
-    all_items = {y for x in options for y in x}
-    item_dicts = {x: {z for y in options for z in y - {x} if x in y} for x in all_items}
-    item_groups = set()
-    for key, val in item_dicts.items():
-        new_set = set()
-        new_set.add(key)
-        new_set |= val
-        new_frozen = frozenset(new_set)
-        item_groups.add(new_frozen)
+    pruned_items = {y for x in options for y in x}
 
-    # Goal: Include all items in the smallest amount of groupings
-    # Go group by group, and include the largest group which contains the item
-    pruned_groups = set()
-    included_items = set()
-    for item in all_items:
-        if item in included_items:
-            continue
+    # look through the combinations, and combine any which exist where all items are
+    #    combined. [[x1, x2], [x2, x3], [x1, x3]] -> [[x1, x2, x3]]
+    for i in reversed(range(NUM_OPTIONAL_ITEMS, len(pruned_items) + 1)):
+        possible_consolidations: Set[FrozenSet[int]] = {
+            frozenset(x) for x in combinations(pruned_items, i)
+        }
 
-        groups = list({x for x in item_groups if item in x})
-        groups.sort(key=lambda x: len(x), reverse=True)
+        for consolidation in possible_consolidations:
+            required_subcombos = {
+                frozenset(x) for x in combinations(consolidation, NUM_OPTIONAL_ITEMS)
+            }
+            if required_subcombos <= options:
+                options.add(consolidation)
 
-        included_items |= groups[0]
-        pruned_groups.add(groups[0])
+    # remove any subsets
+    deduped_options = deepcopy(options)
+    for x in options:
+        for y in options:
+            if x < y:
+                deduped_options.discard(x)
 
-    return pruned_groups
+    return deduped_options
+

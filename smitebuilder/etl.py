@@ -16,7 +16,7 @@ from bidict import bidict
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
-from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuild
+from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuildPath
 
 RawMatchData = Dict[str, Optional[Union[int, str, float, List[int]]]]
 
@@ -200,7 +200,8 @@ def load_build(path: str) -> List[MainReturn]:
 
     return [
         MainReturn(
-            build=ReadableSmiteBuild(core=x[0][0], optional=x[0][1],), confidence=x[1],
+            build=ReadableSmiteBuildPath(core=x[0][0], optionals=x[0][1],),
+            confidence=x[1],
         )
         for x in raw_list
     ]

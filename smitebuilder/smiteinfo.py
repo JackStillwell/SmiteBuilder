@@ -66,7 +66,7 @@ class ReadableSmiteBuild(NamedTuple):
 
 
 class MainReturn(NamedTuple):
-    build: ReadableSmiteBuild
+    build: ReadableSmiteBuildPath
     confidence: float
 
 
