@@ -30,10 +30,14 @@ class ReadableSmiteBuildPath(NamedTuple):
 
     @staticmethod
     def from_SmiteBuildPath(build: SmiteBuildPath, item_map: Dict[int, str]):
-        return ReadableSmiteBuildPath(
-            core=[item_map[x] for x in build.core],
-            optionals=[[item_map[x] for x in y] for y in build.optionals],
-        )
+        core = [item_map[x] for x in build.core]
+        optionals = [[item_map[x] for x in y] for y in build.optionals]
+
+        # just alphabetize the optional lists
+        for optional in optionals:
+            optional.sort()
+
+        return ReadableSmiteBuildPath(core=core, optionals=optionals)
 
     def __str__(self):
         s = "core: \n\t"

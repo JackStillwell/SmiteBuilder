@@ -188,7 +188,9 @@ def main(
     build_paths = [
         SmiteBuildPath(
             core=x,
-            optionals=prune_options(x, (get_options(item_ids, x)), rate_builds_lambda),
+            optionals=prune_options(
+                x, (get_options(item_ids, x)), rate_builds_lambda, 0.75
+            ),
         )
         for x in cores
     ]

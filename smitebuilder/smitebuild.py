@@ -7,7 +7,7 @@ match data by player skill level and converting model output into readable SMITE
 """
 
 from typing import Callable, cast, Dict, List, Optional, Set, FrozenSet, Tuple, Union
-from dataclasses import dataclass
+from copy import deepcopy
 from itertools import combinations
 
 import numpy as np
@@ -374,6 +374,7 @@ def prune_options(
     core: FrozenSet[int],
     optionals: Set[FrozenSet[int]],
     rank_builds: Callable[[List[FrozenSet[int]]], List[float]],
+    rank_cutoff: float,
 ) -> Set[FrozenSet[int]]:
     """Remove any options which lower the score of the build.
 
@@ -385,26 +386,48 @@ def prune_options(
         Set[FrozenSet[int]]: [description]
     """
 
-    # first, remove any single-item options which lower the chance of success
-    single_option_list = [x for x in optionals if len(x) == 1]
-    single_build_list = [core]
-    single_build_list += [option | core for option in single_option_list]
-    single_ranks = rank_builds(single_build_list)
+    # ensure every item is a single option
+    all_items = {y for x in optionals for y in x}
 
-    removed_singles = {
-        option
-        for option, rank in zip(single_option_list, single_ranks)
-        if rank <= single_ranks[0]
+    # figure out how many items are required to fill out the core, then make all possible
+    #    combinations
+    optional_item_num = NUM_ITEMS_IN_BUILD - NUM_ITEMS_IN_CORE
+
+    # rank all combinations, and remove any that lower the rank of the core
+    all_options: List[FrozenSet[int]] = [
+        frozenset(x) for x in combinations(all_items, optional_item_num)
+    ]
+    all_builds: List[FrozenSet[int]] = [
+        frozenset(core | options) for options in all_options
+    ]
+    build_ranks = rank_builds(all_builds)
+    pruned_options = {
+        option for option, rank in zip(all_options, build_ranks) if rank > rank_cutoff
     }
+    pruned_items = {z for z in all_items if z in {y for x in pruned_options for y in x}}
 
-    multi_option_set = {x for x in optionals if len(x) > 1}
-    removed_singles |= multi_option_set
+    # look through the combinations, and combine any which exist where all items are
+    #    combined. [[x1, x2], [x2, x3], [x1, x3]] -> [[x1, x2, x3]]
+    for i in reversed(range(optional_item_num, len(pruned_items) + 1)):
+        possible_consolidations: Set[FrozenSet[int]] = {
+            frozenset(x) for x in combinations(pruned_items, i)
+        }
 
-    # next, look to combine optionals
-    for optional in optionals:
-        pass
+        for consolidation in possible_consolidations:
+            required_subcombos = {
+                frozenset(x) for x in combinations(consolidation, optional_item_num)
+            }
+            if required_subcombos <= pruned_options:
+                pruned_options.add(consolidation)
 
-    return set()
+    # remove any subsets
+    deduped_options = deepcopy(pruned_options)
+    for x in pruned_options:
+        for y in pruned_options:
+            if x < y:
+                deduped_options.discard(x)
+
+    return deduped_options
 
 
 def consolidate_options(options: Set[FrozenSet[int]]) -> Set[FrozenSet[int]]:
