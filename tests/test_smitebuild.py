@@ -9,6 +9,7 @@ from smitebuilder.smitebuild import (
     gen_all_builds,
     select_builds,
     build_similarity,
+    find_common_cores,
 )
 
 from smitebuilder.smiteinfo import RankTier
@@ -159,8 +160,35 @@ def test_build_similarity(builds, expected):
     assert expected == pytest.approx(result)
 
 
-def test_find_common_cores():
-    pass
+traces = [
+    [1, 2, 3, 4, 5, 6],
+    [1, 2, 3, 4, 7, 8],
+    [1, 2, 3, 5, 6, 7],
+    [1, 2, 3, 6, 7, 8],
+    [9, 10, 11, 12, 13, 14],
+    [5, 6, 7, 8, 9, 10],
+    [8, 9, 10, 11, 12, 13],
+]
+
+
+@pytest.mark.parametrize(
+    "core_length,num_cores,expected",
+    [
+        (
+            4,
+            3,
+            {frozenset({1, 2, 3, 7}), frozenset({2, 3, 5, 6}), frozenset({1, 2, 3, 6})},
+        ),
+        (4, None, 84),  # take math.comb(6,4) * 7 and then remove 21 repeats
+    ],
+)
+def test_find_common_cores(core_length, num_cores, expected):
+    result = find_common_cores(traces, core_length, num_cores)
+
+    if type(expected) is set:
+        assert expected == result
+    elif type(expected) is int:
+        assert expected == len(result)
 
 
 def test_get_options():
