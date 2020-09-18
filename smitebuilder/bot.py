@@ -36,6 +36,7 @@ async def on_message(message):
                 "SmiteBuilder encountered an error. Please contact L0RDmomo#7288 on Discord and"
                 + " detail the command which caused this."
             )
+            return
 
         if builds is None:
             await message.channel.send("No builds found")
