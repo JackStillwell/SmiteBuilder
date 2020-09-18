@@ -44,7 +44,11 @@ async def on_message(message):
                 send_str += "confidence: " + str(smitebuild.confidence) + "\n"
                 send_str += "\n"
 
-            await message.channel.send(send_str)
+            if not send_str:
+                await message.channel.send("No builds found")
+
+            else:
+                await message.channel.send(send_str)
 
 
 client.run(token)

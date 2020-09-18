@@ -121,11 +121,23 @@ similarity_data = [
     SmiteBuildPath(core=frozenset({1, 2, 3, 4}), optionals={frozenset({5, 6, 7})}),
     SmiteBuildPath(core=frozenset({1, 6, 3, 5}), optionals={frozenset({2, 4, 7})}),
     SmiteBuildPath(core=frozenset({11, 12, 13, 14}), optionals={frozenset({15, 16})}),
+    SmiteBuildPath(
+        core=frozenset({1, 2, 3, 4}),
+        optionals={frozenset({5, 6, 7}), frozenset({2, 4, 7})},
+    ),
 ]
 
 
 @pytest.mark.parametrize(
-    "num,expected,similarity_cutoff", [(4, [], 0.0), (2, [], 0.0), (1, [], 0.0),],
+    "num,expected,similarity_cutoff",
+    [
+        (4, similarity_data, 1.0),
+        (4, similarity_data[:3], 0.5),
+        (4, [similarity_data[0], similarity_data[2]], 0.0),
+        (2, similarity_data[:2], 1.0),
+        (2, similarity_data[:2], 0.5),
+        (2, [similarity_data[0], similarity_data[2]], 0.0),
+    ],
 )
 def test_select_builds(num, expected, similarity_cutoff):
     result = select_builds(similarity_data, num, similarity_cutoff)
@@ -145,3 +157,19 @@ def test_build_similarity(builds, expected):
     result = build_similarity(builds[0], builds[1])
 
     assert expected == pytest.approx(result)
+
+
+def test_find_common_cores():
+    pass
+
+
+def test_get_options():
+    pass
+
+
+def test_prune_options():
+    pass
+
+
+def test_consolidate_options():
+    pass

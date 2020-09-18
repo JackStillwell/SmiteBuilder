@@ -118,7 +118,8 @@ def test_extract_item_data():
 def test_store_load_build():
     build_to_store = MainReturn(
         build=ReadableSmiteBuildPath(
-            core=["item_one", "item_two"], optionals=[["item_three"]]
+            core=["item_one", "item_two"],
+            optionals=[["item_three", "item_four"], ["item_three", "item_five"]],
         ),
         confidence=90.0,
     )

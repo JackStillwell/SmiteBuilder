@@ -209,7 +209,9 @@ def select_builds(
     builds: List[SmiteBuildPath], num_select: int, build_similarity_cutoff: float
 ) -> List[SmiteBuildPath]:
     """Given a list of builds and number of builds to select, return a list of distinct
-    (a build similarity lower than "build_similarity_cutoff") SmiteBuildPaths.
+    (a build similarity lower than "build_similarity_cutoff") SmiteBuildPaths. It goes through
+    the "builds" and returns once the "num_select" is reached, so any builds after that will
+    not be considered.
 
     Args:
         builds (List[SmiteBuildPath]): [description]
@@ -290,14 +292,14 @@ def find_common_cores(
 
 
 def get_options(traces: List[List[int]], core: FrozenSet[int]) -> Set[FrozenSet[int]]:
-    """[summary]
+    """Given a list of items and a core, determines and returns a set of "optional" item sets.
 
     Args:
-        builds (List[List[int]]): [description]
-        core (FrozenSet[int]): [description]
+        builds (List[List[int]]): A list of list of items.
+        core (FrozenSet[int]): A set representing the "core" found in those items.
 
     Returns:
-        List[int]: [description]
+        Set[FrozenSet[int]]: A set of frozensets of "optional" items found with the core.
     """
     return {frozenset(set(x) - core) for x in traces if core <= set(x)}
 
@@ -308,14 +310,16 @@ def prune_options(
     rank_builds: Callable[[List[FrozenSet[int]]], List[float]],
     rank_percentile_cutoff: int,
 ) -> Set[FrozenSet[int]]:
-    """Remove any options which lower the score of the build.
+    """Remove any options which lower the score of the build below the percentile score of
+    "rank_percentile_cutoff".
 
     Args:
-        core (FrozenSet[int]): [description]
-        optionals (Set[FrozenSet[int]]): [description]
+        core (FrozenSet[int]): The core associated with the optional items.
+        optionals (Set[FrozenSet[int]]): A set of possible optional items used to fill out the build.
 
     Returns:
-        Set[FrozenSet[int]]: [description]
+        Set[FrozenSet[int]]: A set of possible optional items which score in the
+                             "rank_percentile_cutoff" percentile of the optionals.
     """
 
     # ensure every item is a single option
@@ -345,13 +349,14 @@ def prune_options(
 
 
 def consolidate_options(options: Set[FrozenSet[int]]) -> Set[FrozenSet[int]]:
-    """[summary]
+    """Given a set of options, attempts to combine them so that the largest possible option sets
+    are created.
 
     Args:
-        options (Set[FrozenSet[int]]): [description]
+        options (Set[FrozenSet[int]]): Lists of items to fill out the core builds.
 
     Returns:
-        Set[FrozenSet[int]]: [description]
+        Set[FrozenSet[int]]: A consolidated list of lists of items to fill out the core builds.
     """
 
     pruned_items = {y for x in options for y in x}
