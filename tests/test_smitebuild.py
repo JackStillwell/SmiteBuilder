@@ -10,6 +10,9 @@ from smitebuilder.smitebuild import (
     select_builds,
     build_similarity,
     find_common_cores,
+    get_options,
+    prune_options,
+    consolidate_options,
 )
 
 from smitebuilder.smiteinfo import RankTier
@@ -165,21 +168,14 @@ traces = [
     [1, 2, 3, 4, 7, 8],
     [1, 2, 3, 5, 6, 7],
     [1, 2, 3, 6, 7, 8],
-    [9, 10, 11, 12, 13, 14],
-    [5, 6, 7, 8, 9, 10],
-    [8, 9, 10, 11, 12, 13],
 ]
 
 
 @pytest.mark.parametrize(
     "core_length,num_cores,expected",
     [
-        (
-            4,
-            3,
-            {frozenset({1, 2, 3, 7}), frozenset({2, 3, 5, 6}), frozenset({1, 2, 3, 6})},
-        ),
-        (4, None, 84),  # take math.comb(6,4) * 7 and then remove 21 repeats
+        (4, 2, {frozenset({1, 2, 3, 7}), frozenset({1, 2, 3, 6})},),
+        (4, None, 44),  # every possible core based on the items present
     ],
 )
 def test_find_common_cores(core_length, num_cores, expected):
@@ -191,13 +187,53 @@ def test_find_common_cores(core_length, num_cores, expected):
         assert expected == len(result)
 
 
-def test_get_options():
-    pass
+@pytest.mark.parametrize(
+    "core,expected",
+    [
+        (frozenset({1, 2, 3, 4}), {frozenset({5, 6}), frozenset({7, 8})}),
+        (
+            frozenset({1, 2, 3, 6}),
+            {frozenset({4, 5}), frozenset({5, 7}), frozenset({7, 8})},
+        ),
+    ],
+)
+def test_get_options(core, expected):
+    result = get_options(traces, core)
+    assert result == expected
 
 
-def test_prune_options():
-    pass
+@pytest.mark.parametrize(
+    "build_ranks, cutoff, expected",
+    [
+        ([1.0, 2.0, 3.0], 70, {frozenset({6, 7})}),
+        ([1.0, 2.0, 3.0], 30, {frozenset({5, 7}), frozenset({6, 7})}),
+        (
+            [1.0, 2.0, 3.0],
+            0,
+            {frozenset({5, 6}), frozenset({5, 7}), frozenset({6, 7})},
+        ),
+    ],
+)
+def test_prune_options(build_ranks, cutoff, expected):
+    core = frozenset({1, 2, 3, 4})
+    optionals = {frozenset({5, 6}), frozenset({5, 7}), frozenset({6, 7})}
+
+    result = prune_options(core, optionals, lambda x: build_ranks, cutoff)
+
+    assert result == expected
 
 
-def test_consolidate_options():
-    pass
+@pytest.mark.parametrize(
+    "options,expected",
+    [
+        ({}, {}),
+        (
+            {frozenset({1, 2}), frozenset({1, 3}), frozenset({2, 3})},
+            {frozenset({1, 2, 3})},
+        ),
+    ],
+)
+def test_consolidate_options(options, expected):
+    result = consolidate_options(options)
+
+    assert result == expected

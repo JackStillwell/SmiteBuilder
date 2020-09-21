@@ -95,7 +95,15 @@ def prune_item_data(item_matrix: np.ndarray, frequency_cutoff=0.03) -> List[bool
 def feature_to_item(
     feature_ids: List[List[int]], feature_map: List[int]
 ) -> List[List[int]]:
-    """Needs Docstring
+    """Given a list of feature ids and a feature_to_item map, returns a list of item ids given a
+    list of feature ids.
+
+    Args:
+        feature_ids (List[List[int]]): Lists of feature_ids
+        feature_map (List[int]): A map linking feature_id (as idx) to item ids
+
+    Returns:
+        List[List[int]]: Lists of item ids
     """
     return [[feature_map[x] for x in ids] for ids in feature_ids]
 
@@ -342,7 +350,7 @@ def prune_options(
     rank_cutoff = np.percentile(build_ranks, rank_percentile_cutoff)
 
     pruned_options = {
-        option for option, rank in zip(all_options, build_ranks) if rank > rank_cutoff
+        option for option, rank in zip(all_options, build_ranks) if rank >= rank_cutoff
     }
 
     return pruned_options
