@@ -7,16 +7,66 @@ and the data returned by the SMITE API and understood by the models.
 """
 
 from enum import IntEnum
-from typing import List, NamedTuple
+from typing import Dict, List, NamedTuple, Set, FrozenSet
+
+from dataclasses import dataclass
+
+
+@dataclass
+class SmiteBuild:
+    core: Set[int]
+    optional: Set[int]
+
+
+@dataclass
+class SmiteBuildPath:
+    core: FrozenSet[int]
+    optionals: Set[FrozenSet[int]]
+
+
+class ReadableSmiteBuildPath(NamedTuple):
+    core: List[str]
+    optionals: List[List[str]]
+
+    @staticmethod
+    def from_SmiteBuildPath(build: SmiteBuildPath, item_map: Dict[int, str]):
+        core = [item_map[x] for x in build.core]
+        optionals = [[item_map[x] for x in y] for y in build.optionals]
+
+        # just alphabetize the optional lists
+        for optional in optionals:
+            optional.sort()
+
+        return ReadableSmiteBuildPath(core=core, optionals=optionals)
+
+    def __str__(self):
+        s = "core: \n\t"
+        s += str(self.core) + "\n\n"
+        s += "optionals: \n"
+        for o in self.optionals:
+            s += "\t" + str(o) + "\n"
+        s += "\n"
+
+        return s
+
+    def __repr__(self):
+        return str(self)
 
 
 class ReadableSmiteBuild(NamedTuple):
     core: List[str]
     optional: List[str]
 
+    @staticmethod
+    def from_SmiteBuild(build: SmiteBuild, item_map: Dict[int, str]):
+        return ReadableSmiteBuild(
+            core=[item_map[x] for x in build.core],
+            optional=[item_map[x] for x in build.optional],
+        )
+
 
 class MainReturn(NamedTuple):
-    build: ReadableSmiteBuild
+    build: ReadableSmiteBuildPath
     confidence: float
 
 

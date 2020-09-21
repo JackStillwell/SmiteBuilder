@@ -29,6 +29,14 @@ async def on_message(message):
                 + god
                 + "\nDon't forget to use correct capitalization!",
             )
+            return
+
+        except:
+            await message.channel.send(
+                "SmiteBuilder encountered an error. Please contact L0RDmomo#7288 on Discord and"
+                + " detail the command which caused this."
+            )
+            return
 
         if builds is None:
             await message.channel.send("No builds found")
@@ -36,12 +44,18 @@ async def on_message(message):
         else:
             send_str = ""
             for smitebuild in builds:
-                send_str += "core: " + str(smitebuild.build.core) + "\n"
-                send_str += "optional: " + str(smitebuild.build.optional) + "\n"
+                send_str += "core:\n\t" + str(smitebuild.build.core) + "\n"
+                send_str += "optional:\n"
+                for option in smitebuild.build.optionals:
+                    send_str += "\t" + str(option) + "\n"
                 send_str += "confidence: " + str(smitebuild.confidence) + "\n"
                 send_str += "\n"
 
-            await message.channel.send(send_str)
+            if not send_str:
+                await message.channel.send("No builds found")
+
+            else:
+                await message.channel.send(send_str)
 
 
 client.run(token)
