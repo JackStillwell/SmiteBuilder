@@ -19,15 +19,25 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
 
 from smitebuilder import etl, smiteinfo, dt_tracer
-
 from smitebuilder.smitebuild import (
-    rate_smitebuild,
-    make_smitebuilds,
+    feature_to_item,
+    rate_builds,
     fuse_evolution_items,
     prune_item_data,
-    filter_data_by_player_skill
+    filter_data_by_player_skill,
+    select_builds,
+    find_common_cores,
+    get_options,
+    consolidate_options,
+    prune_options,
+    rate_smitebuildpath,
 )
-from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuild
+from smitebuilder.smiteinfo import (
+    MainReturn,
+    ReadableSmiteBuild,
+    SmiteBuildPath,
+    ReadableSmiteBuildPath,
+)
 
 
 def parse_args(args: List[str]) -> Namespace:
@@ -40,8 +50,7 @@ def parse_args(args: List[str]) -> Namespace:
     parser.add_argument("--god", "-g", required=True, type=str)
     parser.add_argument("--conquest_tier", "-ct", default=15, type=int)
     parser.add_argument(
-        "--store_build", "-s", default=False,
-        choices=[True, False], type=bool
+        "--store_build", "-s", default=False, choices=[True, False], type=bool
     )
     parser.add_argument("--silent", default=False, choices=[True, False], type=bool)
 
@@ -68,9 +77,7 @@ def main(
 
     # test if build exists or needs to be generated
     if store_build:
-        build_path = os.path.join(
-            path_to_data, queue + "_builds", target_god + ".json"
-        )
+        build_path = os.path.join(path_to_data, queue + "_builds", target_god + ".json")
         if os.path.isfile(build_path):
             build_time = os.path.getmtime(build_path)
             data_time = os.path.getmtime(match_data_path)
@@ -81,7 +88,6 @@ def main(
                 if not silent:
                     print(build)
                 return build
-
 
     raw_match_data = etl.get_matchdata(match_data_path)
     returnval = []
@@ -96,94 +102,110 @@ def main(
     item_data.item_matrix = item_data.item_matrix[:, item_mask]
     item_data.feature_list = list(compress(item_data.feature_list, item_mask))
 
-    while not returnval:
+    # add mechanic to relax the filter
+    skill_mask = filter_data_by_player_skill(
+        raw_match_data, smiteinfo.RankTier(conquest_tier_cutoff)
+    )
 
-        # add mechanic to relax the filter
-        skill_mask = filter_data_by_player_skill(
-            raw_match_data, smiteinfo.RankTier(conquest_tier_cutoff)
+    performance_data = performance_data[skill_mask, :]
+    win_label = win_label[skill_mask, :]
+    item_data.item_matrix = item_data.item_matrix[skill_mask, :]
+
+    if not silent:
+        print("Currently using", performance_data.shape[0], "matches")
+
+    sgd_classifier = SGDClassifier(max_iter=1000, random_state=0)
+    sgd_classifier.fit(performance_data, win_label.reshape((win_label.shape[0],)))
+
+    if not silent:
+        print("sgd_score:", sgd_classifier.score(performance_data, win_label))
+
+    new_winlabel = sgd_classifier.predict(performance_data)
+
+    dt_classifier = DecisionTreeClassifier(
+        criterion="entropy", max_features=1, random_state=0,
+    )
+    dt_classifier.fit(item_data.item_matrix, new_winlabel)
+    dt_score = dt_classifier.score(item_data.item_matrix, new_winlabel)
+
+    if not silent:
+        print("dt_score:", dt_score)
+
+    bnb_classifier = BernoulliNB()
+    bnb_classifier.fit(item_data.item_matrix, new_winlabel)
+    bnb_score = bnb_classifier.score(item_data.item_matrix, new_winlabel)
+
+    if not silent:
+        print("bnb_score:", bnb_score)
+
+    traces = []
+    dt_tracer.trace_decision(dt_classifier.tree_, 0, [], traces, 5)
+
+    item_ids = feature_to_item(traces, item_data.feature_list)
+
+    # turn the traces into common cores
+    cores = find_common_cores(item_ids, 4, None)
+
+    dt_percentage = dt_score / (dt_score + bnb_score)
+    bnb_percentage = 1.0 - dt_percentage
+    rate_builds_lambda = lambda x: rate_builds(
+        x,
+        item_data.feature_list,
+        dt_classifier,
+        bnb_classifier,
+        dt_percentage,
+        bnb_percentage,
+    )
+
+    build_paths = [
+        SmiteBuildPath(
+            core=x,
+            optionals=consolidate_options(
+                prune_options(x, (get_options(item_ids, x)), rate_builds_lambda, 75)
+            ),
+        )
+        for x in cores
+    ]
+
+    rate_smitebuild_lambda = lambda x: rate_smitebuildpath(
+        x,
+        item_data.feature_list,
+        dt_classifier,
+        bnb_classifier,
+        dt_percentage,
+        bnb_percentage,
+        30,  # 70% of the scores must be above this number
+    )
+
+    # rate the smitebuilds
+    smitebuild_confidence = [(x, rate_smitebuild_lambda(x)) for x in build_paths]
+
+    smitebuild_confidence.sort(key=lambda x: x[1], reverse=True)
+
+    final_builds = select_builds([x[0] for x in smitebuild_confidence], 3, 0.25)
+
+    readable_paths = [
+        (
+            ReadableSmiteBuildPath.from_SmiteBuildPath(x, item_map),
+            rate_smitebuild_lambda(x),
+        )
+        for x in final_builds
+    ]
+
+    for build, rating in readable_paths:
+        elem = MainReturn(build=build, confidence=rating,)
+        returnval.append(elem)
+
+        if not silent:
+            print(elem)
+
+    if store_build:
+        etl.store_build(
+            returnval,
+            os.path.join(path_to_data, queue + "_builds", target_god + ".json"),
         )
 
-        performance_data = performance_data[skill_mask, :]
-        win_label = win_label[skill_mask, :]
-        item_data.item_matrix = item_data.item_matrix[skill_mask, :]
-
-        if not silent:
-            print("Currently using", performance_data.shape[0], "matches")
-
-        sgd_classifier = SGDClassifier(max_iter=1000, random_state=0)
-        sgd_classifier.fit(performance_data, win_label.reshape((win_label.shape[0],)))
-
-        if not silent:
-            print("sgd_score:", sgd_classifier.score(performance_data, win_label))
-
-        new_winlabel = sgd_classifier.predict(performance_data)
-
-        dt_classifier = DecisionTreeClassifier(
-            criterion="entropy", max_features=1, random_state=0,
-        )
-        dt_classifier.fit(item_data.item_matrix, new_winlabel)
-        dt_score = dt_classifier.score(item_data.item_matrix, new_winlabel)
-
-        if not silent:
-            print("dt_score:", dt_score)
-
-        bnb_classifier = BernoulliNB()
-        bnb_classifier.fit(item_data.item_matrix, new_winlabel)
-        bnb_score = bnb_classifier.score(item_data.item_matrix, new_winlabel)
-
-        if not silent:
-            print("bnb_score:", bnb_score)
-
-        traces = []
-        dt_tracer.trace_decision(dt_classifier.tree_, 0, [], traces, 5)
-
-        # turn the traces into smitebuilds
-        smitebuilds = make_smitebuilds(traces, 4, item_data.feature_list)
-
-        dt_percentage = dt_score / (dt_score + bnb_score)
-        bnb_percentage = 1.0 - dt_percentage
-
-        # rate the smitebuilds
-        smitebuild_confidence = [
-            (
-                x,
-                rate_smitebuild(
-                    x,
-                    item_data.feature_list,
-                    dt_classifier,
-                    bnb_classifier,
-                    dt_percentage,
-                    bnb_percentage,
-                    30 # 70% of the scores must be above this number
-                ),
-            )
-            for x in smitebuilds
-        ]
-
-        smitebuild_confidence.sort(key=lambda x: x[1], reverse=True)
-
-        for sb_c in smitebuild_confidence[:3]:
-            elem = MainReturn(
-                build=ReadableSmiteBuild(
-                    core=[item_map[x] for x in sb_c[0].core],
-                    optional=[item_map[x] for x in sb_c[0].optional],
-                ),
-                confidence=sb_c[1],
-            )
-            returnval.append(elem)
-
-            if not silent:
-                print("core:", [item_map[x] for x in sb_c[0].core])
-                print("optional:", [item_map[x] for x in sb_c[0].optional])
-                print("confidence:", sb_c[1])
-
-        if store_build:
-            etl.store_build(
-                returnval, 
-                os.path.join(path_to_data, queue + "_builds", target_god + ".json")
-            )
-
-        return returnval
+    return returnval
 
 
 if __name__ == "__main__":
@@ -194,5 +216,5 @@ if __name__ == "__main__":
         args.god,
         args.conquest_tier,
         args.store_build,
-        args.silent
+        args.silent,
     )

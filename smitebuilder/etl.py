@@ -16,7 +16,7 @@ from bidict import bidict
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
-from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuild
+from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuildPath
 
 RawMatchData = Dict[str, Optional[Union[int, str, float, List[int]]]]
 
@@ -52,7 +52,7 @@ def get_itemmap(path: str) -> Dict[int, str]:
         if item["ItemTier"] == 4 and not item["DeviceName"].startswith("Evolved"):
             item["DeviceName"] = "Evolved " + item["DeviceName"]
 
-    return bidict({x["ItemId"]: x["DeviceName"] for x in items})
+    return bidict({x["ItemId"]: x["DeviceName"] for x in items if x["ItemTier"] >= 3})
 
 
 def get_matchdata(path: str) -> List[RawMatchData]:
@@ -89,8 +89,10 @@ def get_matchdata(path: str) -> List[RawMatchData]:
         "item_ids",
         "match_time_minutes",
     ]
-    
-    raw_data = [{k: v for k, v in x.items() if k in relevant_information} for x in raw_data]
+
+    raw_data = [
+        {k: v for k, v in x.items() if k in relevant_information} for x in raw_data
+    ]
     raw_data = [x for x in raw_data if x["match_time_minutes"] > 0]
 
     return raw_data
@@ -196,10 +198,10 @@ def load_build(path: str) -> List[MainReturn]:
     with open(path, "r") as infile:
         raw_list = json.loads("".join(infile.readlines()))
 
-    return [MainReturn(
-        build=ReadableSmiteBuild(
-            core=x[0][0],
-            optional=x[0][1],
-        ),
-        confidence=x[1],
-    ) for x in raw_list]
+    return [
+        MainReturn(
+            build=ReadableSmiteBuildPath(core=x[0][0], optionals=x[0][1],),
+            confidence=x[1],
+        )
+        for x in raw_list
+    ]
