@@ -34,7 +34,6 @@ from smitebuilder.smitebuild import (
 )
 from smitebuilder.smiteinfo import (
     MainReturn,
-    ReadableSmiteBuild,
     SmiteBuildPath,
     ReadableSmiteBuildPath,
 )
