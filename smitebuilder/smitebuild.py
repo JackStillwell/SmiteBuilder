@@ -135,8 +135,7 @@ def rate_builds(
     dt_percentage: float,
     bnb_percentage: float,
 ) -> List[float]:
-    """NEEDS DOCSTRING
-    """
+    """NEEDS DOCSTRING"""
     if not builds:
         return []
 
@@ -264,6 +263,11 @@ def build_similarity(build1: SmiteBuildPath, build2: SmiteBuildPath) -> float:
     all_possible = all_ones | all_twos
     all_similar = all_ones & all_twos
 
+    # checks to make sure the len of all_possible is not zero, returning
+    # a 0 similarity if it is
+    if not all_possible:
+        return 0
+
     similarity = len(all_similar) / len(all_possible)
 
     return similarity
@@ -272,7 +276,7 @@ def build_similarity(build1: SmiteBuildPath, build2: SmiteBuildPath) -> float:
 def find_common_cores(
     traces: List[List[int]], core_length: int, num_cores: Optional[int]
 ) -> Set[FrozenSet[int]]:
-    """ Detects and returns up to "num cores" most frequently occurring cores in "traces".
+    """Detects and returns up to "num cores" most frequently occurring cores in "traces".
 
     Args:
         builds (List[List[int]]): [description]
@@ -391,4 +395,3 @@ def consolidate_options(options: Set[FrozenSet[int]]) -> Set[FrozenSet[int]]:
                 deduped_options.discard(x)
 
     return deduped_options
-
