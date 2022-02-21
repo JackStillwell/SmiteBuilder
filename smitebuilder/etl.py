@@ -48,9 +48,9 @@ def get_itemmap(path: str) -> Dict[int, str]:
     with open(path, "r") as infile:
         items = json.loads("".join(infile.readlines()))
 
-    for item in items:
-        if item["ItemTier"] == 4 and not item["DeviceName"].startswith("Evolved"):
-            item["DeviceName"] = "Evolved " + item["DeviceName"]
+    # for item in items:
+    #     if item["ItemTier"] == 4 and not item["DeviceName"].startswith("Evolved"):
+    #         item["DeviceName"] = "Evolved " + item["DeviceName"]
 
     return bidict({x["ItemId"]: x["DeviceName"] for x in items if x["ItemTier"] >= 3})
 
@@ -200,7 +200,10 @@ def load_build(path: str) -> List[MainReturn]:
 
     return [
         MainReturn(
-            build=ReadableSmiteBuildPath(core=x[0][0], optionals=x[0][1],),
+            build=ReadableSmiteBuildPath(
+                core=x[0][0],
+                optionals=x[0][1],
+            ),
             confidence=x[1],
         )
         for x in raw_list
