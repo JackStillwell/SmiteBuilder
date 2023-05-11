@@ -49,6 +49,14 @@ def parse_args(args: List[str]) -> Namespace:
     )
     parser.add_argument("--god", "-g", required=True, type=str)
     parser.add_argument("--conquest_tier", "-ct", default=15, type=int)
+    parser.add_argument("--mmr_floor", "-mf", default=1700, type=int)
+    parser.add_argument(
+        "--role",
+        "-r",
+        required=True,
+        type=str,
+        choices=["Carry", "Mid", "Solo", "Support", "Jungle"],
+    )
     parser.add_argument(
         "--store_build", "-s", default=False, choices=[True, False], type=bool
     )
@@ -64,32 +72,42 @@ def main(
     conquest_tier_cutoff: int,
     store_build: bool,
     silent: bool,
+    mmr_floor: int,
+    role: str,
 ) -> Optional[List[MainReturn]]:
     # NOTE assumes laid out as in SmiteData repo
     god_map = etl.get_godmap(os.path.join(path_to_data, "gods.json"))
-    item_map = etl.get_itemmap(os.path.join(path_to_data, "items.json"))
+    itemmap_evolveditemmap = etl.get_itemmap(os.path.join(path_to_data, "items.json"))
+    item_map = itemmap_evolveditemmap[0]
+    evolved_item_map = itemmap_evolveditemmap[1]
 
-    queue_path = queue + "_match_data"
-
-    match_data_path = os.path.join(
-        path_to_data, queue_path, str(god_map.inverse[target_god]) + ".json",
+    mongo_auth_path = os.path.join(
+        path_to_data,
+        "mongo_atlas_auth.json",
     )
 
     # test if build exists or needs to be generated
     if store_build:
-        build_path = os.path.join(path_to_data, queue + "_builds", target_god + ".json")
-        if os.path.isfile(build_path):
-            build_time = os.path.getmtime(build_path)
-            data_time = os.path.getmtime(match_data_path)
+        pass
+        # build_path = os.path.join(path_to_data, queue + "_builds", target_god + ".json")
+        # if os.path.isfile(build_path):
+        #     build_time = os.path.getmtime(build_path)
+        #     data_time = os.path.getmtime(match_data_path)
 
-            # if the build is newer than the data
-            if (build_time - data_time) > 0:
-                build = load_build(build_path)
-                if not silent:
-                    print(build)
-                return build
+        #     # if the build is newer than the data
+        #     if (build_time - data_time) > 0:
+        #         build = load_build(build_path)
+        #         if not silent:
+        #             print(build)
+        #         return build
 
-    raw_match_data = etl.get_matchdata(match_data_path)
+    raw_match_data = etl.get_matchdata(
+        mongo_auth_path,
+        god_map.inverse[target_god],
+        mmr_floor,
+        conquest_tier_cutoff,
+        role,
+    )
     returnval = []
 
     performance_data = etl.extract_performance_data(raw_match_data)
@@ -97,19 +115,18 @@ def main(
     item_data = etl.extract_item_data(raw_match_data, item_map)
 
     # prune and consolidate item data
-    fuse_evolution_items(item_data, item_map)
+    fuse_evolution_items(item_data, item_map, evolved_item_map)
     item_mask = prune_item_data(item_data.item_matrix)
     item_data.item_matrix = item_data.item_matrix[:, item_mask]
     item_data.feature_list = list(compress(item_data.feature_list, item_mask))
 
     # add mechanic to relax the filter
-    skill_mask = filter_data_by_player_skill(
-        raw_match_data, smiteinfo.RankTier(conquest_tier_cutoff)
-    )
-
-    performance_data = performance_data[skill_mask, :]
-    win_label = win_label[skill_mask, :]
-    item_data.item_matrix = item_data.item_matrix[skill_mask, :]
+    # skill_mask = filter_data_by_player_skill(
+    #     raw_match_data, smiteinfo.RankTier(conquest_tier_cutoff)
+    # )
+    # performance_data = performance_data[skill_mask, :]
+    # win_label = win_label[skill_mask, :]
+    # item_data.item_matrix = item_data.item_matrix[skill_mask, :]
 
     if not silent:
         print("Currently using", performance_data.shape[0], "matches")
@@ -123,7 +140,9 @@ def main(
     new_winlabel = sgd_classifier.predict(performance_data)
 
     dt_classifier = DecisionTreeClassifier(
-        criterion="entropy", max_features=1, random_state=0,
+        criterion="entropy",
+        max_features=1,
+        random_state=0,
     )
     dt_classifier.fit(item_data.item_matrix, new_winlabel)
     dt_score = dt_classifier.score(item_data.item_matrix, new_winlabel)
@@ -193,7 +212,10 @@ def main(
     ]
 
     for build, rating in readable_paths:
-        elem = MainReturn(build=build, confidence=rating,)
+        elem = MainReturn(
+            build=build,
+            confidence=rating,
+        )
         returnval.append(elem)
 
         if not silent:
@@ -217,4 +239,6 @@ if __name__ == "__main__":
         args.conquest_tier,
         args.store_build,
         args.silent,
+        args.mmr_floor,
+        args.role,
     )

@@ -43,7 +43,9 @@ def filter_data_by_player_skill(
     return tokeep
 
 
-def fuse_evolution_items(item_data: ItemData, itemmap: Dict[int, str]):
+def fuse_evolution_items(
+    item_data: ItemData, itemmap: Dict[int, str], evolved_item_map: Dict[int, int]
+):
     """Fuses the "Evolved" and "Unevolved" versions of items into their unevolved version.
     NOTE: Works in-place.
 
@@ -52,17 +54,16 @@ def fuse_evolution_items(item_data: ItemData, itemmap: Dict[int, str]):
                               containing item data from each match and a list mapping feature
                               (column) index to item id.
         itemmap (Dict[int, str]): A bidirectional map, with primary bindings from ID to
-                                          Name.
-
+                                  Name.
+        evolved_item_map (Dict[int, int]): A map with keys from all t4 item ids to their t3 items.
     """
 
-    evolved_ids = [k for k, v in itemmap.items() if "Evolved" in v]
     for idx, val in enumerate(item_data.feature_list):
-        if val in evolved_ids:
+        if val in evolved_item_map.keys():
             affected_rows = item_data.item_matrix[:, idx] == 1
             item_data.item_matrix[
                 affected_rows,
-                item_data.feature_list.index(itemmap.inverse[itemmap[val][8:]]),
+                item_data.feature_list.index(evolved_item_map[val]),
             ] = 1
             item_data.item_matrix[affected_rows, idx] = 0
     return None
@@ -135,8 +136,7 @@ def rate_builds(
     dt_percentage: float,
     bnb_percentage: float,
 ) -> List[float]:
-    """NEEDS DOCSTRING
-    """
+    """NEEDS DOCSTRING"""
     if not builds:
         return []
 
@@ -272,7 +272,7 @@ def build_similarity(build1: SmiteBuildPath, build2: SmiteBuildPath) -> float:
 def find_common_cores(
     traces: List[List[int]], core_length: int, num_cores: Optional[int]
 ) -> Set[FrozenSet[int]]:
-    """ Detects and returns up to "num cores" most frequently occurring cores in "traces".
+    """Detects and returns up to "num cores" most frequently occurring cores in "traces".
 
     Args:
         builds (List[List[int]]): [description]
@@ -391,4 +391,3 @@ def consolidate_options(options: Set[FrozenSet[int]]) -> Set[FrozenSet[int]]:
                 deduped_options.discard(x)
 
     return deduped_options
-

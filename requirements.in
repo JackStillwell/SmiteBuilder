@@ -4,3 +4,4 @@ discord
 bidict
 pytest
 pytest-cov
+pymongo

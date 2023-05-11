@@ -6,7 +6,7 @@ The ETL module performs all disk-to-memory conversions required by SmiteBuilder.
 This includes reformatting data as well as data pre-processing.
 """
 
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
 
 import json
@@ -15,6 +15,9 @@ from bidict import bidict
 
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 
 from smitebuilder.smiteinfo import MainReturn, ReadableSmiteBuildPath
 
@@ -36,7 +39,7 @@ def get_godmap(path: str) -> Dict[int, str]:
     return bidict({x["id"]: x["Name"] for x in gods})
 
 
-def get_itemmap(path: str) -> Dict[int, str]:
+def get_itemmap(path: str) -> Tuple[Dict[int, str], Dict[int, int]]:
     """Takes path to json and returns bidirectional map.
 
     Args:
@@ -44,54 +47,90 @@ def get_itemmap(path: str) -> Dict[int, str]:
 
     Returns:
         Dict[int, str]: A bidirectional map, with primary bindings from ID to Name.
+        Dict[int, int]: A map from all tier 4 item ids to their tier 3 ids.
     """
     with open(path, "r", encoding="utf-8") as infile:
         items = json.loads("".join(infile.readlines()))
 
-    # for item in items:
-    #     if item["ItemTier"] == 4 and not item["DeviceName"].startswith("Evolved"):
-    #         item["DeviceName"] = "Evolved " + item["DeviceName"]
+    return (
+        bidict({x["ItemId"]: x["DeviceName"] for x in items if x["ItemTier"] >= 3}),
+        {x["ItemId"]: x["ChildItemId"] for x in items if x["ItemTier"] == 4},
+    )
 
-    return bidict({x["ItemId"]: x["DeviceName"] for x in items if x["ItemTier"] >= 3})
 
-
-def get_matchdata(path: str) -> List[RawMatchData]:
-    """Given the path to a json file containing match information for a particular god, return a
+def get_matchdata(
+    path: str,
+    god_id: int,
+    mmr_floor: int,
+    conquest_tier_floor: int,
+    role: str,
+) -> List[RawMatchData]:
+    """Given the path to a json file containing mongo auth information, return a
     triplet of matrices containing the preprocessed information for that god's match data.
 
     Args:
-        path (str): The full path to a json file containing match data for a particular god.
+        path (str): The full path to a json file containing mongo auth information.
 
     Returns:
         List[RawMatchData]: A list of dictionares containing the information required to run
                             SmiteBuilder.
     """
     with open(path, "r") as infile:
-        raw_data: List[RawMatchData] = json.loads("".join(infile.readlines()))
+        mongo_auth = json.loads("".join(infile.readlines()))
 
-    relevant_information = [
-        "conquest_tier",
-        "duel_tier",
-        "joust_tier",
-        "rank_stat_conquest",
-        "rank_stat_duel",
-        "rank_stat_joust",
-        "assists",
-        "damage_mitigated",
-        "damage_player",
-        "damage_taken",
-        "deaths",
-        "healing",
-        "healing_player_self",
-        "kills_player",
-        "structure_damage",
-        "win_status",
-        "item_ids",
-        "match_time_minutes",
-    ]
+    uri = f"mongodb+srv://{mongo_auth['username']}:{mongo_auth['password']}@{mongo_auth['clusterAddress']}/?{mongo_auth['uriArgs']}"
+    # Create a new client and connect to the server
+    client = MongoClient(uri, server_api=ServerApi("1"))
+    # Send a ping to confirm a successful connection
+    try:
+        client.admin.command("ping")
+        print("Pinged your deployment. You successfully connected to MongoDB!")
+    except Exception as e:
+        exit(e)
+
+    db = client.SmiteBuilds
+    coll = db.MatchDetails
+
+    raw_data = list(
+        coll.find(
+            {
+                "GodId": god_id,
+                "Role": role,
+                "Final_Match_Level": {"$gte": 17},
+                "Rank_Stat_Conquest": {"$gte": mmr_floor},
+                "Conquest_Tier": {"$gte": conquest_tier_floor},
+            }
+        )
+        .sort("Match", -1)
+        .limit(2000)
+    )
+
+    for x in raw_data:
+        item_ids = [x["ItemId" + str(i)] for i in range(1, 7)]
+        x["item_ids"] = item_ids
+
+    relevant_information = {
+        "Assists": "assists",
+        "Damage_Mitigated": "damage_mitigated",
+        "Damage_Player": "damage_player",
+        "Damage_Taken": "damage_taken",
+        "Deaths": "deaths",
+        "Healing": "healing",
+        "Healing_Player_Self": "healing_player_self",
+        "Kills_Player": "kills_player",
+        "Structure_Damage": "structure_damage",
+        "Win_Status": "win_status",
+        "item_ids": "item_ids",
+        "Minutes": "match_time_minutes",
+    }
 
     raw_data = [
-        {k: v for k, v in x.items() if k in relevant_information} for x in raw_data
+        {
+            relevant_information[k]: v
+            for k, v in x.items()
+            if k in relevant_information.keys()
+        }
+        for x in raw_data
     ]
     raw_data = [x for x in raw_data if x["match_time_minutes"] > 0]
 
