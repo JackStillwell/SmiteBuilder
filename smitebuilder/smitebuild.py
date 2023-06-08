@@ -264,9 +264,11 @@ def build_similarity(build1: SmiteBuildPath, build2: SmiteBuildPath) -> float:
     all_possible = all_ones | all_twos
     all_similar = all_ones & all_twos
 
-    similarity = len(all_similar) / len(all_possible)
-
-    return similarity
+    if len(all_possible) == 0:
+        return 0
+    else:
+        similarity = len(all_similar) / len(all_possible)
+        return similarity
 
 
 def find_common_cores(
