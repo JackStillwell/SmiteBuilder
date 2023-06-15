@@ -53,7 +53,13 @@ def get_itemmap(path: str) -> Tuple[Dict[int, str], Dict[int, int]]:
         items = json.loads("".join(infile.readlines()))
 
     return (
-        bidict({x["ItemId"]: x["DeviceName"] for x in items if x["ItemTier"] >= 3}),
+        bidict(
+            {
+                x["ItemId"]: x["DeviceName"]
+                for x in items
+                if x["ActiveFlag"] == "y" and (x["ItemTier"] >= 3 or x["StartingItem"])
+            }
+        ),
         {x["ItemId"]: x["ChildItemId"] for x in items if x["ItemTier"] == 4},
     )
 
