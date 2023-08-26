@@ -12,6 +12,7 @@ numpy = "^1.25.2"
 discord = "^2.3.2"
 bidict = "^0.22.1"
 pymongo = "^4.5.0"
+matplotlib = "^3.7.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
