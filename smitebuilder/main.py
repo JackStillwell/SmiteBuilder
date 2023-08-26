@@ -15,7 +15,7 @@ from typing import List, Optional
 from itertools import compress
 
 from sklearn.linear_model import SGDClassifier
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
 from sklearn.naive_bayes import BernoulliNB
 
 from smitebuilder import etl, smiteinfo, dt_tracer
@@ -31,6 +31,7 @@ from smitebuilder.smitebuild import (
     consolidate_options,
     prune_options,
     rate_smitebuildpath,
+    NUM_ITEMS_IN_CORE,
 )
 from smitebuilder.smiteinfo import (
     MainReturn,
@@ -83,7 +84,7 @@ def main(
 
     mongo_auth_path = os.path.join(
         path_to_data,
-        "mongo_atlas_auth.json",
+        "mongo_tsunami_auth.json",
     )
 
     # test if build exists or needs to be generated
@@ -145,6 +146,13 @@ def main(
         random_state=0,
     )
     dt_classifier.fit(item_data.item_matrix, new_winlabel)
+
+    export_graphviz(
+        dt_classifier,
+        out_file="tree.dot",
+        feature_names=[item_map[x] for x in item_data.feature_list],
+    )
+
     dt_score = dt_classifier.score(item_data.item_matrix, new_winlabel)
 
     if not silent:
@@ -158,12 +166,12 @@ def main(
         print("bnb_score:", bnb_score)
 
     traces = []
-    dt_tracer.trace_decision(dt_classifier.tree_, 0, [], traces, 5)
+    dt_tracer.trace_decision(dt_classifier.tree_, 0, [], traces, NUM_ITEMS_IN_CORE)
 
     item_ids = feature_to_item(traces, item_data.feature_list)
 
     # turn the traces into common cores
-    cores = find_common_cores(item_ids, 4, None)
+    cores = find_common_cores(item_ids, NUM_ITEMS_IN_CORE, None)
 
     dt_percentage = dt_score / (dt_score + bnb_score)
     bnb_percentage = 1.0 - dt_percentage

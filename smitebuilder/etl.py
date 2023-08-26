@@ -84,7 +84,7 @@ def get_matchdata(
     with open(path, "r") as infile:
         mongo_auth = json.loads("".join(infile.readlines()))
 
-    uri = f"mongodb+srv://{mongo_auth['username']}:{mongo_auth['password']}@{mongo_auth['clusterAddress']}/?{mongo_auth['uriArgs']}"
+    uri = f"mongodb://{mongo_auth['username']}:{mongo_auth['password']}@{mongo_auth['clusterAddress']}/?{mongo_auth['uriArgs']}"
     # Create a new client and connect to the server
     client = MongoClient(uri, server_api=ServerApi("1"))
     # Send a ping to confirm a successful connection
@@ -102,13 +102,12 @@ def get_matchdata(
             {
                 "GodId": god_id,
                 "Role": role,
-                "Final_Match_Level": {"$gte": 17},
+                "Final_Match_Level": {"$gte": 12},
                 "Rank_Stat_Conquest": {"$gte": mmr_floor},
                 "Conquest_Tier": {"$gte": conquest_tier_floor},
             }
-        )
-        .sort("Match", -1)
-        .limit(2000)
+        ).sort("Match", -1)
+        # .limit(2000)
     )
 
     for x in raw_data:
